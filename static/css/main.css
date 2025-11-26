@@ -1,0 +1,184 @@
+/* ====== GLOBAL ====== */
+
+body {
+    background-color: #f3f4f6;
+    /* jasne tło, trochę "chmurkowe" */
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* lekkie wygładzenie kart */
+.card {
+    border-radius: 0.5rem;
+}
+
+/* ====== NAVBAR (górny pasek) ====== */
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.4);
+}
+
+/* możesz tu dopasować do swojego logo – np. primary ciemny kolor */
+.navbar.bg-dark {
+    background: #111827;
+}
+
+/* ====== SIDEBAR ====== */
+
+.sidebar {
+    min-height: calc(100vh - 56px);
+    /* pełna wysokość pod navbarem */
+    background: #020617;
+    /* bardzo ciemny, ładnie wygląda z kartami */
+    border-right: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.sidebar .nav-link {
+    font-size: 0.95rem;
+    padding: 0.6rem 1rem;
+    color: #e5e7eb;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+}
+
+.sidebar .nav-link span.me-2 {
+    font-size: 1.1rem;
+}
+
+/* link po najechaniu */
+.sidebar .nav-link:hover {
+    background: rgba(148, 163, 184, 0.1);
+    color: #f9fafb;
+}
+
+/* aktywny element menu – pionowy pasek + tło */
+.sidebar .nav-link.active {
+    background: rgba(37, 99, 235, 0.15);
+    /* lekkie niebieskie tło */
+    color: #ffffff;
+    border-left: 3px solid #2563eb;
+    /* akcent w kolorze primary */
+    padding-left: calc(1rem - 3px);
+    /* żeby tekst się nie przestawiał */
+}
+
+/* ====== CONTENT AREA ====== */
+
+main {
+    background-color: transparent;
+}
+
+/* nagłówki sekcji */
+main h1.h3 {
+    font-weight: 600;
+}
+
+/* ====== KAFLE KPI ====== */
+
+.card-body .h3 {
+    font-weight: 600;
+}
+
+.card-body .text-muted.small {
+    font-size: 0.8rem;
+}
+
+/* delikatny cień tylko dla kart na dashboardzie */
+.card.shadow-sm {
+    box-shadow: 0 4px 6px rgba(15, 23, 42, 0.08);
+}
+
+/* ====== BADGE'E STATUSÓW ====== */
+
+/* możesz później dostosować do swoich preferencji kolorów,
+   na razie korzystamy z bootstrapowych klas, ale trochę je wzmacniamy */
+
+.badge.bg-danger {
+    background-color: #dc2626 !important;
+    /* intensywna czerwień */
+}
+
+.badge.bg-warning.text-dark {
+    background-color: #f97316 !important;
+    /* pomarańcz */
+    color: #111827 !important;
+}
+
+.badge.bg-success {
+    background-color: #16a34a !important;
+    /* ładna zieleń "ok" */
+}
+
+.badge.bg-primary {
+    background-color: #2563eb !important;
+    /* niebieski primary */
+}
+
+/* lekkie zaokrąglenie */
+.badge {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+/* ====== TABELA ZLECEŃ ====== */
+
+.table> :not(caption)>*>* {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #eef2ff;
+    /* bardzo delikatny fiolet/niebieski */
+}
+
+/* ====== PROGRESS BARS ====== */
+
+.progress {
+    background-color: #e5e7eb;
+}
+
+.progress-bar {
+    background-color: #2563eb;
+}
+
+/* ====== PRZYCISKI ====== */
+
+/* primary – w kolorze "firmowym" */
+.btn-primary {
+    background-color: #2563eb;
+    border-color: #2563eb;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+/* outline secondary – delikatniejszy, do "Podgląd" itp. */
+.btn-outline-secondary {
+    color: #4b5563;
+    border-color: #cbd5f5;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #e5e7eb;
+    color: #111827;
+}
+
+/* przyciski w tabelach – minimalnie mniejsze */
+.table .btn-sm {
+    padding: 0.15rem 0.55rem;
+    font-size: 0.75rem;
+}
+
+/* ====== MAŁE DODATKI ====== */
+
+.text-muted.small {
+    font-size: 0.8rem;
+}
+
+/* filtry "Wszystkie / Serwis / Przeglądy / Roboty" */
+.card-header .btn-group .btn {
+    font-size: 0.75rem;
+}

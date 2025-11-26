@@ -1,0 +1,10 @@
+from django.urls import path
+from . import views
+
+app_name = "core"
+
+urlpatterns = [
+    path("", views.dashboard, name="dashboard"),
+    path("zlecenia/", views.workorder_list, name="workorder_list"),
+    path("zlecenia/<int:pk>/", views.workorder_detail, name="workorder_detail"),
+]

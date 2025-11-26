@@ -1,0 +1,91 @@
+{% load static %}
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}ALLSEC Portal{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap 5 z CDN (na start) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+      crossorigin="anonymous"
+    >
+
+    <!-- Nasz styl (później rozbudujemy) -->
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+  </head>
+  <body class="bg-light">
+
+    <!-- GÓRNY PASEK -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="#">
+          ALLSEC Portal
+        </a>
+
+        <div class="d-flex align-items-center ms-auto">
+          <span class="text-white-50 me-3 small">
+            Zalogowano jako: <strong>demo.user</strong>
+          </span>
+          <button class="btn btn-outline-light btn-sm" type="button">
+            Wyloguj
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- GŁÓWNY LAYOUT -->
+    <div class="container-fluid">
+      <div class="row">
+        <!-- LEWY SIDEBAR -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark text-white sidebar collapse">
+          <div class="position-sticky pt-3">
+            <ul class="nav flex-column">
+              <li class="nav-item">
+                <a class="nav-link text-white active" aria-current="page" href="{% url 'core:dashboard' %}">
+                  <span class="me-2">🏠</span> Dashboard
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="{% url 'core:workorder_list' %}">
+                  <span class="me-2">🛠️</span> Zlecenia
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="#">
+                  <span class="me-2">📄</span> Protokoły
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="#">
+                  <span class="me-2">🏢</span> Obiekty
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="#">
+                  <span class="me-2">📊</span> Raporty
+                </a>
+              </li>
+            </ul>
+          </div>
+        </nav>
+
+        <!-- PRAWA CZĘŚĆ – CONTENT -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
+          {% block content %}
+          <!-- Tutaj wchodzą konkretne strony -->
+          {% endblock %}
+        </main>
+      </div>
+    </div>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+      crossorigin="anonymous">
+    </script>
+  </body>
+</html>

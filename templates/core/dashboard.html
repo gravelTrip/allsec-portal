@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Dashboard</h1>
+      <p class="text-muted small mb-0">
+        Szybki podgląd zleceń, przeglądów i robót.
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <select class="form-select form-select-sm">
+        <option>Dzisiejsze</option>
+        <option>Najbliższe 7 dni</option>
+        <option>Ten miesiąc</option>
+      </select>
+      <div class="form-check form-switch d-flex align-items-center">
+        <input class="form-check-input" type="checkbox" id="onlyMine">
+        <label class="form-check-label small ms-1" for="onlyMine">
+          Tylko moje zlecenia
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- KAFLE KPI (na razie na sztywno) -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="card-title text-muted text-uppercase small mb-2">
+            Otwarte zlecenia
+          </h6>
+          <div class="d-flex align-items-baseline">
+            <span class="h3 mb-0 me-2">{{ stats.open_orders }}</span>
+            <span class="text-muted small">zleceń niezamkniętych</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="card-title text-muted text-uppercase small mb-2">
+            Zlecenia pilne
+          </h6>
+          <div class="d-flex align-items-baseline">
+            <span class="h3 mb-0 me-2 text-danger">{{ stats.critical_orders }}</span>
+            <span class="text-muted small">priorytet krytyczny</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="card-title text-muted text-uppercase small mb-2">
+            Przeglądy po terminie
+          </h6>
+          <div class="d-flex align-items-baseline">
+            <span class="h3 mb-0 me-2 text-warning">{{ stats.overdue_maintenance }}</span>
+            <span class="text-muted small">po terminie</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="card-title text-muted text-uppercase small mb-2">
+            Roboty w realizacji
+          </h6>
+          <div class="d-flex align-items-baseline">
+            <span class="h3 mb-0 me-2">{{ stats.jobs_in_progress }}</span>
+            <span class="text-muted small">otwarte projekty</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ZLECENIA NA DZIŚ (na razie przykładowe) -->
+  <div class="row">
+    <div class="col-lg-8 mb-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+          <h6 class="mb-0">Zlecenia na dziś</h6>
+          <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-secondary active">Wszystkie</button>
+            <button type="button" class="btn btn-outline-secondary">Serwis</button>
+            <button type="button" class="btn btn-outline-secondary">Przeglądy</button>
+            <button type="button" class="btn btn-outline-secondary">Roboty</button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+              <tr>
+                <th>Zlecenie</th>
+                <th>Obiekt</th>
+                <th>Typ</th>
+                <th>Status</th>
+                <th>Planowana data</th>
+                <th></th>
+              </tr>
+            </thead>
+                        <tbody>
+              {% if today_orders %}
+                {% for order in today_orders %}
+                  <tr>
+                    <td>
+                      #{{ order.id }} {{ order.title }}
+                    </td>
+                    <td>
+                      {{ order.site.name }}
+                    </td>
+                    <td>
+                      {% if order.work_type == order.WorkOrderType.SERVICE %}
+                        <span class="badge bg-danger">Serwis</span>
+                      {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+                        <span class="badge bg-info text-dark">Przegląd</span>
+                      {% elif order.work_type == order.WorkOrderType.JOB %}
+                        <span class="badge bg-secondary">Robota</span>
+                      {% else %}
+                        <span class="badge bg-light text-dark">Inne</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if order.status == order.Status.NEW %}
+                        <span class="badge bg-primary">Nowe</span>
+                      {% elif order.status == order.Status.IN_PROGRESS %}
+                        <span class="badge bg-warning text-dark">W realizacji</span>
+                      {% elif order.status == order.Status.COMPLETED %}
+                        <span class="badge bg-success">Zamknięte</span>
+                      {% else %}
+                        <span class="badge bg-light text-dark">Inny</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {{ order.planned_date|date:"d.m.Y" }}
+                    </td>
+                    <td class="text-end">
+                      <button class="btn btn-sm btn-primary">
+                        Otwórz
+                      </button>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted small py-3">
+                    Brak zleceń zaplanowanych na dziś.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prawa kolumna – skróty -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Przeglądy w tym tygodniu</h6>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item small">
+            27.11 – WM Przemyska 25–33 – SSP + Oddymianie
+          </li>
+          <li class="list-group-item small">
+            28.11 – Osiedle Zielone – CCTV
+          </li>
+        </ul>
+      </div>
+
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Roboty – w realizacji</h6>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item small">
+            Montaż CCTV – Przemyska 25–33
+            <div class="progress mt-1" style="height: 4px;">
+              <div class="progress-bar" style="width: 60%;"></div>
+            </div>
+          </li>
+          <li class="list-group-item small">
+            Modernizacja SSP – Galeria Alfa
+            <div class="progress mt-1" style="width: 80%; height: 4px;">
+              <div class="progress-bar bg-success" style="width: 80%;"></div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+{% endblock %}
