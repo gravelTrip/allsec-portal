@@ -3,7 +3,7 @@
 {% block title %}Zlecenia – ALLSEC Portal{% endblock %}
 
 {% block content %}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
       <h1 class="h3 mb-0">Zlecenia</h1>
       <p class="text-muted small mb-0">
@@ -11,36 +11,45 @@
       </p>
     </div>
 
-    <form method="get" class="d-flex align-items-center gap-2">
-      <select name="work_type" class="form-select form-select-sm">
-        {% for value, label in work_type_choices %}
-          <option value="{{ value }}"
-                  {% if value == filter_work_type %}selected{% endif %}>
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+    <div class="d-flex align-items-center gap-2">
+      <form method="get" class="d-flex align-items-center gap-2 mb-0">
+        <select name="work_type" class="form-select form-select-sm">
+          {% for value, label in work_type_choices %}
+            <option value="{{ value }}"
+                    {% if value == filter_work_type %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
 
-      <select name="status" class="form-select form-select-sm">
-        {% for value, label in status_choices %}
-          <option value="{{ value }}"
-                  {% if value == filter_status %}selected{% endif %}>
-            {{ label }}
-          </option>
-        {% endfor %}
-      </select>
+        <select name="status" class="form-select form-select-sm">
+          {% for value, label in status_choices %}
+            <option value="{{ value }}"
+                    {% if value == filter_status %}selected{% endif %}>
+              {{ label }}
+            </option>
+          {% endfor %}
+        </select>
 
-      <button class="btn btn-sm btn-outline-secondary" type="submit">
-        Filtruj
-      </button>
+        <button class="btn btn-sm btn-outline-secondary" type="submit">
+          Filtruj
+        </button>
 
-      {% if filter_work_type or filter_status %}
-        <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-link">
-          Wyczyść
+        {% if filter_work_type or filter_status %}
+          <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-link">
+            Wyczyść
+          </a>
+        {% endif %}
+      </form>
+
+      {% if can_create %}
+        <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-primary">
+          Nowe zlecenie
         </a>
       {% endif %}
-    </form>
+    </div>
   </div>
+
 
   <div class="card shadow-sm border-0">
     <div class="card-body p-0">

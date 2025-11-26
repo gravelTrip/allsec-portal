@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Nowe zlecenie – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">Nowe zlecenie</h1>
+      <p class="text-muted small mb-0">
+        Utwórz nowe zlecenie serwisowe, przegląd lub robotę.
+      </p>
+    </div>
+    <div>
+      <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-outline-secondary">
+        ← Wróć do listy
+      </a>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2 small">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="mb-2">
+              <label class="form-label small">Typ zlecenia</label>
+              {{ form.work_type }}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="mb-2">
+              <label class="form-label small">Status</label>
+              {{ form.status }}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="mb-2">
+              <label class="form-label small">Priorytet</label>
+              {{ form.priority }}
+            </div>
+          </div>
+
+          <div class="col-md-8">
+            <div class="mb-2">
+              <label class="form-label small">Tytuł</label>
+              {{ form.title }}
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="mb-2">
+              <label class="form-label small">Planowana data</label>
+              {{ form.planned_date }}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Obiekt</label>
+              {{ form.site }}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Osoba zgłaszająca</label>
+              {{ form.requested_by }}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Przypisano do (serwisant)</label>
+              {{ form.assigned_to }}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Systemy objęte zleceniem</label>
+              {{ form.systems }}
+              {% if form.systems.help_text %}
+                <div class="form-text small">{{ form.systems.help_text }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="mb-2">
+              <label class="form-label small">Opis zgłoszenia / zakres prac</label>
+              {{ form.description }}
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-end gap-2">
+          <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-outline-secondary">
+            Anuluj
+          </a>
+          <button type="submit" class="btn btn-sm btn-primary">
+            Zapisz zlecenie
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

@@ -22,18 +22,27 @@
     <!-- GÓRNY PASEK -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
-        <a class="navbar-brand fw-bold" href="#">
+        <a class="navbar-brand fw-bold" href="{% url 'core:dashboard' %}">
           ALLSEC Portal
         </a>
 
-        <div class="d-flex align-items-center ms-auto">
-          <span class="text-white-50 me-3 small">
-            Zalogowano jako: <strong>demo.user</strong>
-          </span>
-          <button class="btn btn-outline-light btn-sm" type="button">
-            Wyloguj
-          </button>
-        </div>
+        {% if request.user.is_authenticated %}
+          <div class="d-flex align-items-center ms-auto">
+            <span class="text-white-50 me-3 small">
+              Zalogowano jako:
+              <strong>
+                {{ request.user.get_full_name|default:request.user.username }}
+              </strong>
+            </span>
+            <form method="post" action="{% url 'logout' %}" class="mb-0">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-outline-light btn-sm">
+                Wyloguj
+              </button>
+            </form>
+          </div>
+        {% endif %}
+
       </div>
     </nav>
 
