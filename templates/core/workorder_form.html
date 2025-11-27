@@ -5,10 +5,17 @@
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h1 class="h4 mb-1">Nowe zlecenie</h1>
-      <p class="text-muted small mb-0">
-        Utwórz nowe zlecenie serwisowe, przegląd lub robotę.
-      </p>
+      {% if is_edit %}
+        <h1 class="h4 mb-1">Edytuj zlecenie #{{ order.id }}</h1>
+        <p class="text-muted small mb-0">
+          Zmień dane zlecenia zgodnie z aktualnym statusem i ustaleniami.
+        </p>
+      {% else %}
+        <h1 class="h4 mb-1">Nowe zlecenie</h1>
+        <p class="text-muted small mb-0">
+          Utwórz nowe zlecenie serwisowe, przegląd lub robotę.
+        </p>
+      {% endif %}
     </div>
     <div>
       <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-outline-secondary">

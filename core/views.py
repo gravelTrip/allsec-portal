@@ -181,11 +181,15 @@ def workorder_detail(request, pk):
     # spróbujemy wyciągnąć powiązany protokół serwisowy (jeśli istnieje)
     service_report = getattr(order, "service_report", None)
 
+    can_edit = is_office(request.user)
+
     context = {
         "order": order,
         "service_report": service_report,
+        "can_edit": can_edit,
     }
     return render(request, "core/workorder_detail.html", context)
+
 
 @login_required
 def workorder_create(request):
@@ -203,8 +207,34 @@ def workorder_create(request):
 
     context = {
         "form": form,
+        "is_edit": False,
+        "order": None,
     }
     return render(request, "core/workorder_form.html", context)
+
+@login_required
+def workorder_edit(request, pk):
+    order = get_object_or_404(WorkOrder, pk=pk)
+
+    # tylko biuro może edytować zlecenia
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji zlecenia.")
+
+    if request.method == "POST":
+        form = WorkOrderForm(request.POST, instance=order)
+        if form.is_valid():
+            form.save()
+            return redirect("core:workorder_detail", pk=order.pk)
+    else:
+        form = WorkOrderForm(instance=order)
+
+    context = {
+        "form": form,
+        "is_edit": True,
+        "order": order,
+    }
+    return render(request, "core/workorder_form.html", context)
+
 
 @login_required
 def ajax_site_systems(request, site_id):

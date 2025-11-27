@@ -4,20 +4,27 @@
 
 {% block content %}
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h1 class="h4 mb-1">
-        Zlecenie #{{ order.id }} – {{ order.title }}
-      </h1>
-      <p class="text-muted small mb-0">
-        Obiekt: {{ order.site.name }}
-      </p>
-    </div>
-    <div class="d-flex gap-2">
-      <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-outline-secondary">
-        ← Wróć do listy
-      </a>
-    </div>
+  <div>
+    <h1 class="h4 mb-1">
+      Zlecenie #{{ order.id }} – {{ order.title }}
+    </h1>
+    <p class="text-muted small mb-0">
+      Szczegóły zlecenia serwisowego / przeglądu / robót.
+    </p>
   </div>
+
+  <div class="d-flex gap-2">
+    <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-outline-secondary">
+      ← Lista zleceń
+    </a>
+
+    {% if can_edit %}
+      <a href="{% url 'core:workorder_edit' order.pk %}" class="btn btn-sm btn-primary">
+        Edytuj zlecenie
+      </a>
+    {% endif %}
+  </div>
+</div>
 
   <div class="row g-3">
     <!-- LEWA KOLUMNA: podstawowe info -->

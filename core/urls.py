@@ -8,6 +8,7 @@ urlpatterns = [
     path("zlecenia/", views.workorder_list, name="workorder_list"),
     path("zlecenia/nowe/", views.workorder_create, name="workorder_create"),
     path("zlecenia/<int:pk>/", views.workorder_detail, name="workorder_detail"),
+    path("zlecenia/<int:pk>/edytuj/", views.workorder_edit, name="workorder_edit"),
 
     path(
         "ajax/site/<int:site_id>/systems/",
@@ -15,4 +16,5 @@ urlpatterns = [
         name="ajax_site_systems",
     ),
 ]
+
 
