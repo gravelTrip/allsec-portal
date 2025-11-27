@@ -94,10 +94,25 @@
                 <td>
                   {% if order.status == order.Status.NEW %}
                     <span class="badge bg-primary">Nowe</span>
+
+                  {% elif order.status == order.Status.SCHEDULED %}
+                    <span class="badge bg-info text-dark">Umówione</span>
+
                   {% elif order.status == order.Status.IN_PROGRESS %}
                     <span class="badge bg-warning text-dark">W realizacji</span>
+
+                  {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+                    <span class="badge bg-secondary">Czeka na decyzję</span>
+
+                  {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+                    <span class="badge bg-secondary">Czeka na materiał</span>
+
                   {% elif order.status == order.Status.COMPLETED %}
-                    <span class="badge bg-success">Zamknięte</span>
+                    <span class="badge bg-success">Zakończone</span>
+
+                  {% elif order.status == order.Status.CANCELLED %}
+                    <span class="badge bg-danger">Odwołane</span>
+
                   {% else %}
                     <span class="badge bg-light text-dark">Inny</span>
                   {% endif %}
@@ -118,7 +133,7 @@
                 <td class="text-end">
                   <a href="{% url 'core:workorder_detail' order.pk %}" class="btn btn-sm btn-primary">
                     Szczegóły
-                  </button>
+                  </a>
                 </td>
               </tr>
             {% endfor %}

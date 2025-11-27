@@ -98,78 +98,44 @@ def dashboard(request):
 
 @login_required
 def workorder_list(request):
-    user = request.user
-
-    orders_qs = (
-        WorkOrder.objects.all()
-        .select_related("site")
-        .order_by("-planned_date", "-updated_at")
+    qs = (
+        WorkOrder.objects
+        .select_related("site", "assigned_to")
+        .prefetch_related("systems")
+        .order_by("-created_at")  # albo inne sortowanie, które już masz
     )
 
-    # jeśli serwisant (i nie biuro) -> tylko jego zlecenia
-    if is_technician(user) and not is_office(user):
-        orders_qs = orders_qs.filter(assigned_to=user)
-
-    # wartości z query stringa, np. ?work_type=SERVICE&status=NEW
+    # wartości z filtrów (z formularza w template)
     filter_work_type = request.GET.get("work_type", "")
     filter_status = request.GET.get("status", "")
 
-    # filtr po typie zlecenia
     if filter_work_type:
-        try:
-            if filter_work_type in WorkOrder.WorkOrderType.values:
-                orders_qs = orders_qs.filter(work_type=filter_work_type)
-        except AttributeError:
-            orders_qs = orders_qs.filter(work_type=filter_work_type)
+        qs = qs.filter(work_type=filter_work_type)
 
-    # filtr po statusie
     if filter_status:
-        try:
-            if filter_status in WorkOrder.Status.values:
-                orders_qs = orders_qs.filter(status=filter_status)
-        except AttributeError:
-            orders_qs = orders_qs.filter(status=filter_status)
+        qs = qs.filter(status=filter_status)
 
-    # paginacja
+    paginator = Paginator(qs, 20)  # np. 20 zleceń na stronę
     page_number = request.GET.get("page")
-    paginator = Paginator(orders_qs, 25)
     page_obj = paginator.get_page(page_number)
 
-    # listy do selectów
-    work_type_choices = []
-    try:
-        work_type_choices = [
-            ("", "Typ: wszystkie"),
-            (WorkOrder.WorkOrderType.SERVICE, "Serwis"),
-            (WorkOrder.WorkOrderType.MAINTENANCE, "Przegląd"),
-            (WorkOrder.WorkOrderType.JOB, "Robota"),
-        ]
-    except AttributeError:
-        work_type_choices = [("", "Typ: wszystkie")]
-
-    status_choices = []
-    try:
-        status_choices = [
-            ("", "Status: wszystkie"),
-            (WorkOrder.Status.NEW, "Nowe"),
-            (WorkOrder.Status.IN_PROGRESS, "W realizacji"),
-            (WorkOrder.Status.COMPLETED, "Zamknięte"),
-        ]
-    except AttributeError:
-        status_choices = [("", "Status: wszystkie")]
+    # choices do selectów (pierwsza opcja = "wszystkie")
+    work_type_choices = [("", "Typ: wszystkie")] + list(WorkOrder.WorkOrderType.choices)
+    status_choices = [("", "Status: wszystkie")] + list(WorkOrder.Status.choices)
 
     context = {
         "orders": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
-        "filter_work_type": filter_work_type,
-        "filter_status": filter_status,
+
         "work_type_choices": work_type_choices,
         "status_choices": status_choices,
-        "can_create": is_office(user),
+        "filter_work_type": filter_work_type,
+        "filter_status": filter_status,
+
+        "can_create": is_office(request.user),
     }
     return render(request, "core/workorder_list.html", context)
-
 
 @login_required
 def workorder_detail(request, pk):
