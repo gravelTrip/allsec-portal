@@ -458,11 +458,6 @@ class WorkOrder(models.Model):
         COMPLETED = "COMPLETED", "Zakończone"
         CANCELLED = "CANCELLED", "Odwołane"
 
-    class Priority(models.TextChoices):
-        NORMAL = "NORMAL", "Normalny"
-        HIGH = "HIGH", "Wysoki"
-        CRITICAL = "CRITICAL", "Krytyczny"
-
     class VisitType(models.TextChoices):
         FLEXIBLE = "FLEXIBLE", "W ciągu dnia"
         WINDOW = "WINDOW", "Na przedział godzinowy"
@@ -532,14 +527,6 @@ class WorkOrder(models.Model):
         verbose_name="Status",
     )
 
-
-    priority = models.CharField(
-        "Priorytet",
-        max_length=20,
-        choices=Priority.choices,
-        default=Priority.NORMAL,
-    )
-
     requested_by = models.ForeignKey(
         Contact,
         on_delete=models.SET_NULL,
@@ -559,9 +546,9 @@ class WorkOrder(models.Model):
     )
 
     planned_date = models.DateField(
-        "Planowana data wizyty",
         blank=True,
         null=True,
+        verbose_name="Termin realizacji"
     )
 
     visit_type = models.CharField(

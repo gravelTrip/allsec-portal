@@ -247,7 +247,6 @@ class WorkOrderAdmin(admin.ModelAdmin):
         "site",
         "work_type",
         "status",
-        "priority",
         "planned_date",
         "assigned_to",
         "updated_at",
@@ -255,7 +254,6 @@ class WorkOrderAdmin(admin.ModelAdmin):
     list_filter = (
         "work_type",
         "status",
-        "priority",
         "site__city",
         "site__entity",
         "site__manager",

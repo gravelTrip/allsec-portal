@@ -108,18 +108,26 @@ def workorder_list(request):
     # wartości z filtrów (z formularza w template)
     filter_work_type = request.GET.get("work_type", "")
     filter_status = request.GET.get("status", "")
+    show_closed = request.GET.get("show_closed") == "on"
 
     if filter_work_type:
         qs = qs.filter(work_type=filter_work_type)
 
     if filter_status:
+        # jeśli użytkownik wybrał konkretny status, pokazujemy dokładnie ten
         qs = qs.filter(status=filter_status)
+    else:
+        # jeśli NIE wybrano konkretnego statusu i checkbox nie zaznaczony,
+        # ukrywamy Zakończone i Odwołane
+        if not show_closed:
+            qs = qs.exclude(
+                status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED]
+            )
 
-    paginator = Paginator(qs, 20)  # np. 20 zleceń na stronę
+    paginator = Paginator(qs, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    # choices do selectów (pierwsza opcja = "wszystkie")
     work_type_choices = [("", "Typ: wszystkie")] + list(WorkOrder.WorkOrderType.choices)
     status_choices = [("", "Status: wszystkie")] + list(WorkOrder.Status.choices)
 
@@ -127,12 +135,11 @@ def workorder_list(request):
         "orders": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
-
         "work_type_choices": work_type_choices,
         "status_choices": status_choices,
         "filter_work_type": filter_work_type,
         "filter_status": filter_status,
-
+        "show_closed": show_closed,
         "can_create": is_office(request.user),
     }
     return render(request, "core/workorder_list.html", context)

@@ -12,6 +12,10 @@
         Zlecenie #{{ order.id }} – {{ order.title }}
       {% endif %}
     </h1>
+    <p class="mb-1">
+      <span class="text-muted small">Utworzone:</span>
+      {{ order.created_at|date:"d.m.Y H:i" }}
+    </p>
     <p class="text-muted small mb-0">
       Szczegóły zlecenia serwisowego / przeglądu / robót.
     </p>
@@ -52,15 +56,30 @@
           </div>
 
           <div class="mb-2">
-            <span class="text-muted">Status:</span>
+            <span class="text-muted small">Status:</span>
             {% if order.status == order.Status.NEW %}
-              <span class="badge bg-primary ms-1">Nowe</span>
+              <span class="badge bg-primary">Nowe</span>
+
+            {% elif order.status == order.Status.SCHEDULED %}
+              <span class="badge bg-info text-dark">Umówione</span>
+
             {% elif order.status == order.Status.IN_PROGRESS %}
-              <span class="badge bg-warning text-dark ms-1">W realizacji</span>
+              <span class="badge bg-warning text-dark">W realizacji</span>
+
+            {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+              <span class="badge bg-secondary">Czeka na decyzję</span>
+
+            {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+              <span class="badge bg-secondary">Czeka na materiał</span>
+
             {% elif order.status == order.Status.COMPLETED %}
-              <span class="badge bg-success ms-1">Zamknięte</span>
+              <span class="badge bg-success">Zakończone</span>
+
+            {% elif order.status == order.Status.CANCELLED %}
+              <span class="badge bg-danger">Odwołane</span>
+
             {% else %}
-              <span class="badge bg-light text-dark ms-1">Inny</span>
+              <span class="badge bg-light text-dark">Inny</span>
             {% endif %}
           </div>
 
@@ -70,7 +89,7 @@
           </div>
 
           <div class="mb-2">
-            <span class="text-muted">Planowana data:</span>
+            <span class="text-muted">Termin realizacji:</span>
             {{ order.planned_date|date:"d.m.Y" }}
           </div>
 

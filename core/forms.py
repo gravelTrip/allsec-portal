@@ -18,7 +18,6 @@ class WorkOrderForm(forms.ModelForm):
             "description",
             "site",
             "systems",
-            "priority",
             "status",
             "planned_date",
             "visit_type",
@@ -30,7 +29,6 @@ class WorkOrderForm(forms.ModelForm):
         widgets = {
             "work_type": forms.Select(attrs={"class": "form-select form-select-sm"}),
             "status": forms.Select(attrs={"class": "form-select form-select-sm"}),
-            "priority": forms.Select(attrs={"class": "form-select form-select-sm"}),
 
             "title": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
 

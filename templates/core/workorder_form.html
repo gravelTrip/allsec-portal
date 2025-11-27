@@ -71,21 +71,10 @@
             </div>
           </div>
 
-          <!-- Rząd 2: priorytet + planowana data -->
+          <!-- Rząd 2: termin realizacji -->
           <div class="col-md-6">
             <div class="mb-2">
-              <label class="form-label small">Priorytet</label>
-              {{ form.priority }}
-              {% if form.priority.errors %}
-                <div class="text-danger small mt-1">
-                  {{ form.priority.errors|striptags }}
-                </div>
-              {% endif %}
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="mb-2">
-              <label class="form-label small">Planowana data wizyty</label>
+              <label class="form-label small">Termin realizacji</label>
               {{ form.planned_date }}
               {% if form.planned_date.errors %}
                 <div class="text-danger small mt-1">
