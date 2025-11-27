@@ -17,29 +17,44 @@
     </div>
   </div>
 
-    <div class="card shadow-sm border-0">
+  <div class="card shadow-sm border-0">
     <div class="card-body">
       <form method="post" novalidate>
         {% csrf_token %}
 
-        {% if form.non_field_errors %}
+        {% if form.errors %}
           <div class="alert alert-danger py-2 small">
-            {{ form.non_field_errors }}
+            Formularz zawiera błędy. Popraw pola oznaczone poniżej.
+            {% if form.non_field_errors %}
+              <div class="mt-1">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
           </div>
         {% endif %}
 
         <div class="row g-3">
-          <!-- Rząd 1: typ + status -->
+          <!-- Rząd 1: typ zlecenia + status -->
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Typ zlecenia</label>
               {{ form.work_type }}
+              {% if form.work_type.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.work_type.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Status</label>
               {{ form.status }}
+              {% if form.status.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.status.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
 
@@ -48,44 +63,107 @@
             <div class="mb-2">
               <label class="form-label small">Priorytet</label>
               {{ form.priority }}
+              {% if form.priority.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.priority.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
           <div class="col-md-6">
             <div class="mb-2">
-              <label class="form-label small">Planowana data</label>
+              <label class="form-label small">Planowana data wizyty</label>
               {{ form.planned_date }}
+              {% if form.planned_date.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.planned_date.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
 
-          <!-- Rząd 3: tytuł + obiekt -->
+          <!-- Rząd 3: rodzaj wizyty + przedział godzinowy -->
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Rodzaj wizyty</label>
+              {{ form.visit_type }}
+              {% if form.visit_type.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.visit_type.errors|striptags }}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small d-block">Przedział godzinowy</label>
+              <div class="d-flex align-items-center gap-2">
+                {{ form.planned_time_from }}
+                <span class="small text-muted">–</span>
+                {{ form.planned_time_to }}
+              </div>
+              {% if form.planned_time_from.errors or form.planned_time_to.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.planned_time_from.errors|striptags }}
+                  {{ form.planned_time_to.errors|striptags }}
+                </div>
+              {% else %}
+                <div class="form-text small">
+                  Wypełnij tylko dla wizyt „na przedział godzinowy”.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Rząd 4: tytuł + obiekt -->
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Tytuł</label>
               {{ form.title }}
+              {% if form.title.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.title.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Obiekt</label>
               {{ form.site }}
+              {% if form.site.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.site.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
 
-          <!-- Rząd 4: osoba zgłaszająca + serwisant -->
+          <!-- Rząd 5: osoba zgłaszająca + serwisant -->
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Osoba zgłaszająca</label>
               {{ form.requested_by }}
+              {% if form.requested_by.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.requested_by.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Przypisano do (serwisant)</label>
               {{ form.assigned_to }}
+              {% if form.assigned_to.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.assigned_to.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
 
-                   <!-- Rząd 5: systemy -->
+          <!-- Rząd 6: systemy -->
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small d-block">Systemy objęte zleceniem</label>
@@ -100,25 +178,29 @@
               </div>
 
               <div class="form-text small">
-                Zaznacz systemy, których dotyczy zlecenie.
+                Zaznacz systemy, których dotyczy zlecenie. Lista jest filtrowana po wybranym obiekcie.
               </div>
 
-              {{ form.systems }} {# ukryte inputy dla Django, nie ruszamy #}
+              {{ form.systems }} {# ukryte inputy dla Django #}
 
               {% if form.systems.errors %}
                 <div class="text-danger small mt-1">
-                  {{ form.systems.errors }}
+                  {{ form.systems.errors|striptags }}
                 </div>
               {% endif %}
             </div>
           </div>
 
-
-          <!-- Rząd 6: opis – pełna szerokość -->
+          <!-- Rząd 7: opis – pełna szerokość -->
           <div class="col-12">
             <div class="mb-2">
               <label class="form-label small">Opis zgłoszenia / zakres prac</label>
               {{ form.description }}
+              {% if form.description.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.description.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -134,6 +216,7 @@
       </form>
     </div>
   </div>
+
 
 <script>
     (function() {

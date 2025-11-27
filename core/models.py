@@ -451,14 +451,22 @@ class WorkOrder(models.Model):
 
     class Status(models.TextChoices):
         NEW = "NEW", "Nowe"
-        ASSIGNED = "ASSIGNED", "Przydzielone"
+        SCHEDULED = "SCHEDULED", "Umówione"
         IN_PROGRESS = "IN_PROGRESS", "W realizacji"
-        CLOSED = "CLOSED", "Zamknięte"
+        WAITING_FOR_DECISION = "WAITING_FOR_DECISION", "Czeka na decyzję klienta"
+        WAITING_FOR_PARTS = "WAITING_FOR_PARTS", "Czeka na materiał"
+        COMPLETED = "COMPLETED", "Zakończone"
+        CANCELLED = "CANCELLED", "Odwołane"
 
     class Priority(models.TextChoices):
         NORMAL = "NORMAL", "Normalny"
         HIGH = "HIGH", "Wysoki"
         CRITICAL = "CRITICAL", "Krytyczny"
+
+    class VisitType(models.TextChoices):
+        FLEXIBLE = "FLEXIBLE", "W ciągu dnia"
+        WINDOW = "WINDOW", "Na przedział godzinowy"
+
 
     site = models.ForeignKey(
         Site,
@@ -510,11 +518,12 @@ class WorkOrder(models.Model):
     )
 
     status = models.CharField(
-        "Status",
-        max_length=20,
+        max_length=32,
         choices=Status.choices,
         default=Status.NEW,
+        verbose_name="Status",
     )
+
 
     priority = models.CharField(
         "Priorytet",
@@ -545,6 +554,25 @@ class WorkOrder(models.Model):
         "Planowana data wizyty",
         blank=True,
         null=True,
+    )
+
+    visit_type = models.CharField(
+        max_length=16,
+        choices=VisitType.choices,
+        default=VisitType.FLEXIBLE,
+        verbose_name="Rodzaj wizyty",
+    )
+
+    planned_time_from = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="Godzina od",
+    )
+
+    planned_time_to = models.TimeField(
+        null=True,
+        blank=True,
+        verbose_name="Godzina do",
     )
 
     created_at = models.DateTimeField("Utworzono", auto_now_add=True)
