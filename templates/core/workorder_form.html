@@ -6,7 +6,13 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
       {% if is_edit %}
-        <h1 class="h4 mb-1">Edytuj zlecenie #{{ order.id }}</h1>
+        <h1 class="h4 mb-1">
+          {% if order.number %}
+            Edytuj zlecenie {{ order.number }}
+          {% else %}
+            Edytuj zlecenie #{{ order.id }}
+          {% endif %}
+        </h1>
         <p class="text-muted small mb-0">
           Zmień dane zlecenia zgodnie z aktualnym statusem i ustaleniami.
         </p>

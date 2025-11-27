@@ -56,7 +56,7 @@
       <table class="table table-hover mb-0 align-middle">
         <thead class="table-light">
           <tr>
-            <th>ID</th>
+            <th>Numer</th>
             <th>Tytuł</th>
             <th>Obiekt</th>
             <th>Typ</th>
@@ -71,7 +71,13 @@
           {% if orders %}
             {% for order in orders %}
               <tr>
-                <td>#{{ order.id }}</td>
+                <td>
+                  {% if order.number %}
+                    {{ order.number }}
+                  {% else %}
+                    #{{ order.id }}
+                  {% endif %}
+                </td>
                 <td>{{ order.title }}</td>
                 <td>{{ order.site.name }}</td>
                 <td>

@@ -6,7 +6,11 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h1 class="h4 mb-1">
-      Zlecenie #{{ order.id }} – {{ order.title }}
+      {% if order.number %}
+        Zlecenie {{ order.number }} – {{ order.title }}
+      {% else %}
+        Zlecenie #{{ order.id }} – {{ order.title }}
+      {% endif %}
     </h1>
     <p class="text-muted small mb-0">
       Szczegóły zlecenia serwisowego / przeglądu / robót.

@@ -468,6 +468,14 @@ class WorkOrder(models.Model):
         WINDOW = "WINDOW", "Na przedział godzinowy"
 
 
+    number = models.CharField(
+        max_length=32,
+        unique=True,
+        blank=True,
+        null=True,
+        verbose_name="Numer zlecenia",
+    )
+
     site = models.ForeignKey(
         Site,
         on_delete=models.CASCADE,
@@ -586,6 +594,25 @@ class WorkOrder(models.Model):
 
     def __str__(self):
         return f"#{self.id} {self.title}"
+    
+    def save(self, *args, **kwargs):
+        # jeśli numer nie ustawiony – wygeneruj
+        if not self.number:
+            today = timezone.localdate()
+            month_str = f"{today.month:02d}"
+            year_str = str(today.year)
+
+            # sufiks daty: MM-YYYY, np. "11-2025"
+            date_suffix = f"{month_str}-{year_str}"
+
+            # policz ile zleceń już ma numer z tym sufiksem
+            # np. "ZL 01-11-2025", "ZL 02-11-2025" itd.
+            base_qs = WorkOrder.objects.filter(number__endswith=date_suffix)
+            count = base_qs.count() + 1
+
+            self.number = f"ZL {count:02d}-{date_suffix}"
+
+        super().save(*args, **kwargs)
     
 
 class ServiceReport(models.Model):
