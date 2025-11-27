@@ -46,11 +46,11 @@
       <div class="card shadow-sm border-0">
         <div class="card-body">
           <h6 class="card-title text-muted text-uppercase small mb-2">
-            Zlecenia pilne
+            Czeka na decyzję / materiał
           </h6>
           <div class="d-flex align-items-baseline">
-            <span class="h3 mb-0 me-2 text-danger">{{ stats.critical_orders }}</span>
-            <span class="text-muted small">priorytet krytyczny</span>
+            <span class="h3 mb-0 me-2 text-warning">{{ stats.critical_orders }}</span>
+            <span class="text-muted small">zleceń oczekujących</span>
           </div>
         </div>
       </div>
@@ -63,7 +63,7 @@
             Przeglądy po terminie
           </h6>
           <div class="d-flex align-items-baseline">
-            <span class="h3 mb-0 me-2 text-warning">{{ stats.overdue_maintenance }}</span>
+            <span class="h3 mb-0 me-2 text-danger">{{ stats.overdue_maintenance }}</span>
             <span class="text-muted small">po terminie</span>
           </div>
         </div>

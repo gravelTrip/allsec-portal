@@ -38,56 +38,46 @@ def dashboard(request):
     # - biuro: wszystkie zlecenia
     # - serwisant: tylko przypisane do niego
     base_qs = WorkOrder.objects.all()
-
     if is_technician(user) and not is_office(user):
         base_qs = base_qs.filter(assigned_to=user)
 
-    # statystyki do kafelków (na bazie base_qs)
-    try:
-        open_orders = base_qs.exclude(
-            status=WorkOrder.Status.COMPLETED
-        ).count()
-    except AttributeError:
-        open_orders = base_qs.count()
+    # 1) Otwarte zlecenia (wszystko poza zakończonymi)
+    open_orders = base_qs.exclude(status=WorkOrder.Status.COMPLETED).count()
 
-    try:
-        critical_orders = base_qs.filter(
-            priority=getattr(WorkOrder.Priority, "CRITICAL", None)
-        ).exclude(
-            status=getattr(WorkOrder.Status, "COMPLETED", None)
-        ).count()
-    except AttributeError:
-        critical_orders = 0
+    # 2) "Krytyczne" – teraz rozumiemy jako oczekujące na decyzję klienta lub materiał
+    critical_orders = base_qs.filter(
+        status__in=[
+            WorkOrder.Status.WAITING_FOR_DECISION,
+            WorkOrder.Status.WAITING_FOR_PARTS,
+        ]
+    ).count()
 
-    try:
-        overdue_maintenance = base_qs.filter(
-            work_type=WorkOrder.WorkOrderType.MAINTENANCE,
-            planned_date__lt=today,
-        ).exclude(
-            status=WorkOrder.Status.COMPLETED
-        ).count()
-    except AttributeError:
-        overdue_maintenance = 0
+    # 3) Przeterminowane przeglądy (MAINTENANCE z terminem w przeszłości, nie zakończone)
+    overdue_maintenance = base_qs.filter(
+        work_type=WorkOrder.WorkOrderType.MAINTENANCE,
+        planned_date__lt=today,
+    ).exclude(
+        status=WorkOrder.Status.COMPLETED
+    ).count()
 
-    # roboty na razie liczymy globalnie (później możemy zawęzić)
+    # 4) Roboty w toku (wszystko poza zakończonymi)
     try:
-        jobs_in_progress = Job.objects.exclude(
-            status=getattr(Job.Status, "COMPLETED", None)
-        ).count()
+        jobs_in_progress = Job.objects.exclude(status=Job.Status.COMPLETED).count()
     except AttributeError:
+        # gdyby Job.Status jeszcze nie miał COMPLETED, pokaż po prostu liczbę robót
         jobs_in_progress = Job.objects.count()
 
-    # ZLECENIA NA DZIŚ – też na bazie base_qs
+    # ZLECENIA NA DZIŚ – posortowane po dacie i dacie utworzenia (bez priority)
     today_orders = (
         base_qs.filter(planned_date=today)
-        .order_by("planned_date", "priority")
+        .order_by("planned_date", "created_at")
         .select_related("site")
     )
 
     context = {
         "stats": {
             "open_orders": open_orders,
-            "critical_orders": critical_orders,
+            "critical_orders": critical_orders,          # teraz: czekające na decyzję / materiał
             "overdue_maintenance": overdue_maintenance,
             "jobs_in_progress": jobs_in_progress,
         },
