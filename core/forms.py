@@ -1,9 +1,14 @@
 from django import forms
-
-from .models import WorkOrder
+from .models import WorkOrder, System
 
 
 class WorkOrderForm(forms.ModelForm):
+    systems = forms.ModelMultipleChoiceField(
+        queryset=System.objects.all(),
+        required=False,
+        widget=forms.MultipleHiddenInput,  # <-- TU DODAJEMY
+    )
+
     class Meta:
         model = WorkOrder
         fields = [
@@ -26,33 +31,28 @@ class WorkOrderForm(forms.ModelForm):
             "title": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
 
             "planned_date": forms.DateInput(
-                attrs={
-                    "type": "date",
-                    "class": "form-control form-control-sm",
-                }
+                attrs={"type": "date", "class": "form-control form-control-sm"}
             ),
 
             "site": forms.Select(attrs={"class": "form-select form-select-sm"}),
-            # jeśli requested_by jest ForeignKey do Contact – Select jest OK.
-            # Jeśli dostałbyś błąd, zmienimy na TextInput.
             "requested_by": forms.Select(attrs={"class": "form-select form-select-sm"}),
-
             "assigned_to": forms.Select(attrs={"class": "form-select form-select-sm"}),
 
-            "systems": forms.SelectMultiple(
-                attrs={
-                    "class": "form-select form-select-sm",
-                    "size": 6,
-                }
-            ),
-
+            # ⛔ USUŃ STĄD WPIS "systems": ...  – już go nie potrzebujemy
             "description": forms.Textarea(
-                attrs={
-                    "class": "form-control form-control-sm",
-                    "rows": 4,
-                }
+                attrs={"class": "form-control form-control-sm", "rows": 4}
             ),
         }
-        help_texts = {
-            "systems": "Wybierz systemy, których dotyczy zlecenie (przytrzymaj Ctrl, aby zaznaczyć wiele).",
-        }
+
+
+    def clean_systems(self):
+        systems = self.cleaned_data.get("systems")
+        site = self.cleaned_data.get("site")
+
+        if site and systems:
+            invalid = systems.exclude(site=site)
+            if invalid.exists():
+                raise forms.ValidationError(
+                    "Wybrano systemy, które nie należą do wybranego obiektu."
+                )
+        return systems

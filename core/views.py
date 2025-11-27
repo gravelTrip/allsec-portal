@@ -3,9 +3,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.core.paginator import Paginator
 from django.utils import timezone
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 
-from .models import WorkOrder, Job
+from .models import WorkOrder, Job, System
 from .forms import WorkOrderForm
 
 
@@ -205,3 +205,34 @@ def workorder_create(request):
         "form": form,
     }
     return render(request, "core/workorder_form.html", context)
+
+@login_required
+def ajax_site_systems(request, site_id):
+    # dostęp: biuro + (w przyszłości) serwisanci
+    if not (is_office(request.user) or is_technician(request.user)):
+        return JsonResponse({"detail": "Forbidden"}, status=403)
+
+    systems = (
+        System.objects.filter(site_id=site_id)
+        .order_by("system_type", "manufacturer", "model")
+    )
+
+    data = []
+    for s in systems:
+        parts = [s.get_system_type_display()]
+        if s.manufacturer:
+            parts.append(str(s.manufacturer))
+        if s.model:
+            parts.append(str(s.model))
+        label = " – ".join(parts)
+        if getattr(s, "in_contract", False):
+            label += " (w umowie)"
+
+        data.append(
+            {
+                "id": s.id,
+                "label": label,
+            }
+        )
+
+    return JsonResponse({"systems": data})

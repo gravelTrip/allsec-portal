@@ -17,7 +17,7 @@
     </div>
   </div>
 
-  <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0">
     <div class="card-body">
       <form method="post" novalidate>
         {% csrf_token %}
@@ -29,67 +29,92 @@
         {% endif %}
 
         <div class="row g-3">
-          <div class="col-md-4">
+          <!-- Rząd 1: typ + status -->
+          <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Typ zlecenia</label>
               {{ form.work_type }}
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Status</label>
               {{ form.status }}
             </div>
           </div>
-          <div class="col-md-4">
+
+          <!-- Rząd 2: priorytet + planowana data -->
+          <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Priorytet</label>
               {{ form.priority }}
             </div>
           </div>
-
-          <div class="col-md-8">
-            <div class="mb-2">
-              <label class="form-label small">Tytuł</label>
-              {{ form.title }}
-            </div>
-          </div>
-          <div class="col-md-4">
+          <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Planowana data</label>
               {{ form.planned_date }}
             </div>
           </div>
 
+          <!-- Rząd 3: tytuł + obiekt -->
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">Tytuł</label>
+              {{ form.title }}
+            </div>
+          </div>
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Obiekt</label>
               {{ form.site }}
             </div>
           </div>
+
+          <!-- Rząd 4: osoba zgłaszająca + serwisant -->
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Osoba zgłaszająca</label>
               {{ form.requested_by }}
             </div>
           </div>
-
           <div class="col-md-6">
             <div class="mb-2">
               <label class="form-label small">Przypisano do (serwisant)</label>
               {{ form.assigned_to }}
             </div>
           </div>
+
+                   <!-- Rząd 5: systemy -->
           <div class="col-md-6">
             <div class="mb-2">
-              <label class="form-label small">Systemy objęte zleceniem</label>
-              {{ form.systems }}
-              {% if form.systems.help_text %}
-                <div class="form-text small">{{ form.systems.help_text }}</div>
+              <label class="form-label small d-block">Systemy objęte zleceniem</label>
+
+              <div id="systems-container"
+                   class="border rounded p-2 bg-light"
+                   style="max-height: 200px; overflow-y: auto;"
+                   data-selected="{{ form.systems.value|join:',' }}">
+                <p class="text-muted small mb-1">
+                  Najpierw wybierz obiekt.
+                </p>
+              </div>
+
+              <div class="form-text small">
+                Zaznacz systemy, których dotyczy zlecenie.
+              </div>
+
+              {{ form.systems }} {# ukryte inputy dla Django, nie ruszamy #}
+
+              {% if form.systems.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.systems.errors }}
+                </div>
               {% endif %}
             </div>
           </div>
 
+
+          <!-- Rząd 6: opis – pełna szerokość -->
           <div class="col-12">
             <div class="mb-2">
               <label class="form-label small">Opis zgłoszenia / zakres prac</label>
@@ -109,4 +134,92 @@
       </form>
     </div>
   </div>
+
+<script>
+    (function() {
+      const siteSelect = document.getElementById("id_site");
+      const container = document.getElementById("systems-container");
+      const selectedAttr = container ? (container.dataset.selected || "") : "";
+      let initiallySelected = selectedAttr ? selectedAttr.split(",") : [];
+
+      function renderSystems(systems) {
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        if (!systems.length) {
+          container.innerHTML = '<p class="text-muted small mb-0">Brak systemów przypisanych do tego obiektu.</p>';
+          return;
+        }
+
+        systems.forEach(function(sys) {
+          const idStr = String(sys.id);
+
+          const wrapper = document.createElement("div");
+          wrapper.className = "form-check small mb-1";
+
+          const input = document.createElement("input");
+          input.type = "checkbox";
+          input.className = "form-check-input";
+          input.name = "systems";
+          input.value = idStr;
+          input.id = "system_" + idStr;
+
+          // zaznaczenie przy edycji istniejącego zlecenia
+          if (initiallySelected.includes(idStr)) {
+            input.checked = true;
+          }
+
+          const label = document.createElement("label");
+          label.className = "form-check-label";
+          label.setAttribute("for", input.id);
+          label.textContent = sys.label;
+
+          wrapper.appendChild(input);
+          wrapper.appendChild(label);
+          container.appendChild(wrapper);
+        });
+      }
+
+      function fetchSystems(siteId) {
+        if (!container) return;
+
+        if (!siteId) {
+          container.innerHTML = '<p class="text-muted small mb-0">Najpierw wybierz obiekt.</p>';
+          return;
+        }
+
+        const url = "{% url 'core:ajax_site_systems' 0 %}".replace("0", siteId);
+
+        fetch(url)
+          .then(function(response) {
+            if (!response.ok) {
+              throw new Error("Błąd pobierania systemów");
+            }
+            return response.json();
+          })
+          .then(function(data) {
+            renderSystems(data.systems || []);
+          })
+          .catch(function(error) {
+            console.error(error);
+            container.innerHTML = '<p class="text-danger small mb-0">Nie udało się pobrać systemów.</p>';
+          });
+      }
+
+      if (siteSelect) {
+        siteSelect.addEventListener("change", function() {
+          // po zmianie obiektu resetujemy wcześniejsze zaznaczenia
+          initiallySelected = [];
+          fetchSystems(this.value);
+        });
+
+        // przy edycji (albo jeśli ktoś wstawi initial site) – załaduj od razu
+        if (siteSelect.value) {
+          fetchSystems(siteSelect.value);
+        }
+      }
+    })();
+  </script>
+
 {% endblock %}
