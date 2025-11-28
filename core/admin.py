@@ -58,13 +58,13 @@ class SystemInline(admin.TabularInline):
 class WorkOrderInlineForSite(admin.TabularInline):
     model = WorkOrder
     extra = 0
-    fields = ("title", "work_type", "status", "priority", "planned_date", "assigned_to")
+    fields = ("title", "work_type", "status", "planned_date", "assigned_to")
     show_change_link = True
 
 class WorkOrderInlineForJob(admin.TabularInline):
     model = WorkOrder
     extra = 0
-    fields = ("title", "work_type", "status", "priority", "planned_date", "assigned_to", "site")
+    fields = ("title", "work_type", "status", "planned_date", "assigned_to", "site")
     show_change_link = True
 
 class ServiceReportItemInline(admin.TabularInline):
@@ -278,6 +278,7 @@ class ServiceReportAdmin(admin.ModelAdmin):
         "number",
         "work_order",
         "report_date",
+        "status",
         "service_mode",
         "payment_method",
         "result",
@@ -290,7 +291,7 @@ class ServiceReportAdmin(admin.ModelAdmin):
         "requester_name",
         "requester_phone",
     )
-    list_filter = ("service_mode", "payment_method", "result", "report_date")
+    list_filter = ("status", "service_mode", "payment_method", "result", "report_date")
     date_hierarchy = "report_date"
     inlines = [ServiceReportItemInline]
 
@@ -303,7 +304,7 @@ class ServiceReportAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "work_order",
-                    ("number", "report_date"),
+                    ("number", "status", "report_date"),
                     ("service_mode", "payment_method"),
                 )
             },

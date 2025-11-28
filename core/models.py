@@ -621,6 +621,10 @@ class ServiceReport(models.Model):
         NOT_FIXED = "NOT_FIXED", "Nie usunięto usterki"
         INSPECTION_ONLY = "INSPECTION_ONLY", "Sprawdzenie / diagnostyka"
 
+    class Status(models.TextChoices):
+        DRAFT = "DRAFT", "Szkic"
+        FINAL = "FINAL", "Zatwierdzony"
+
     work_order = models.OneToOneField(
         WorkOrder,
         on_delete=models.CASCADE,
@@ -633,7 +637,14 @@ class ServiceReport(models.Model):
         "Numer protokołu",
         max_length=20,
         blank=True,
-        help_text="Jeśli puste, numer zostanie nadany automatycznie w formacie 'PS 01-11-2025'.",
+        help_text="Jeśli puste, numer zostanie nadany automatycznie przy zatwierdzeniu (PS 01-MM-RRRR).",
+    )
+
+    status = models.CharField(
+        "Status",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT,
     )
 
     report_date = models.DateField("Data protokołu", blank=True, null=True)
@@ -745,17 +756,24 @@ class ServiceReport(models.Model):
         if not self.report_date:
             self.report_date = timezone.localdate()
 
-        # auto numeracja, jeśli brak numeru
-        if not self.number:
+        # AUTO NUMERACJA TYLKO DLA ZATWIERDZONYCH (FINAL)
+        if (
+            self.status == ServiceReport.Status.FINAL
+            and not self.number
+            and self.report_date
+        ):
             year = self.report_date.year
             month = self.report_date.month
 
+            # liczymy tylko protokoły, które JUŻ MAJĄ numer (inne FINAL/DRAFT z pustym numerem ignorujemy)
             count = (
                 ServiceReport.objects.filter(
                     report_date__year=year,
                     report_date__month=month,
                 )
                 .exclude(pk=self.pk)
+                .exclude(number__isnull=True)
+                .exclude(number__exact="")
                 .count()
             )
             next_number = count + 1
@@ -781,11 +799,14 @@ class ServiceReport(models.Model):
         # auto serwisant z work_order.assigned_to
         if self.work_order and self.work_order.assigned_to and not self.technicians:
             user = self.work_order.assigned_to
-            full_name = getattr(user, "get_full_name", lambda: "")() or getattr(user, "username", "")
+            full_name = getattr(user, "get_full_name", lambda: "")() or getattr(
+                user, "username", ""
+            )
             if full_name:
                 self.technicians = full_name
 
         super().save(*args, **kwargs)
+
 
 
 

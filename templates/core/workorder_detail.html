@@ -184,22 +184,31 @@
           <div class="card-body small">
             {% if service_report %}
               <p class="mb-2">
-                Protokół: <strong>{{ service_report.number }}</strong> z dnia
-                {{ service_report.report_date|date:"d.m.Y" }}
+                Protokół:
+                {% if service_report.number %}
+                  <strong>{{ service_report.number }}</strong>
+                {% else %}
+                  <span class="text-muted">bez numeru (szkic)</span>
+                {% endif %}
+                {% if service_report.report_date %}
+                  z dnia {{ service_report.report_date|date:"d.m.Y" }}
+                {% endif %}
               </p>
-              <a href="/admin/core/servicereport/{{ service_report.id }}/change/"
-                 class="btn btn-sm btn-outline-secondary">
-                Otwórz w panelu administracyjnym
-              </a>
             {% else %}
               <p class="text-muted small mb-2">
                 Brak powiązanego protokołu serwisowego.
               </p>
-              <a href="/admin/core/servicereport/add/?work_order={{ order.id }}"
-                 class="btn btn-sm btn-primary">
-                Dodaj protokół serwisowy (admin)
-              </a>
             {% endif %}
+
+            <a href="{% url 'core:service_report_entry' order.pk %}"
+              class="btn btn-sm btn-primary">
+              Otwórz / utwórz protokół serwisowy
+            </a>
+
+            <p class="text-muted small mt-2 mb-0">
+              Przycisk otwiera istniejący protokół lub tworzy nowy szkic (bez numeru).
+              Numer PS zostanie nadany po zatwierdzeniu w biurze.
+            </p>
           </div>
         </div>
       {% endif %}

@@ -1,5 +1,5 @@
 from django import forms
-from .models import WorkOrder, System
+from .models import WorkOrder, System, ServiceReport
 
 
 class WorkOrderForm(forms.ModelForm):
@@ -125,3 +125,28 @@ class WorkOrderForm(forms.ModelForm):
             cleaned["planned_time_to"] = None
 
         return cleaned
+    
+class ServiceReportForm(forms.ModelForm):
+    class Meta:
+        model = ServiceReport
+        # Na początek tylko "nagłówek" i treść – bez pozycji/materiałów
+        fields = [
+            "report_date",
+            "service_mode",
+            "payment_method",
+            "requester_name",
+            "requester_phone",
+            "description_before",
+            "work_performed",
+            "result",
+            "next_actions",
+            "technicians",
+            "notes_internal",
+        ]
+        widgets = {
+            "report_date": forms.DateInput(attrs={"type": "date"}),
+            "description_before": forms.Textarea(attrs={"rows": 3}),
+            "work_performed": forms.Textarea(attrs={"rows": 4}),
+            "next_actions": forms.Textarea(attrs={"rows": 3}),
+            "notes_internal": forms.Textarea(attrs={"rows": 3}),
+        }

@@ -5,8 +5,8 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse
 
-from .models import WorkOrder, Job, System
-from .forms import WorkOrderForm
+from .models import WorkOrder, Job, System, ServiceReport
+from .forms import WorkOrderForm, ServiceReportForm
 
 
 # Create your views here.
@@ -229,3 +229,65 @@ def ajax_site_systems(request, site_id):
         )
 
     return JsonResponse({"systems": data})
+
+@login_required
+def service_report_edit(request, pk):
+    """
+    Edycja protokołu serwisowego na froncie (na razie tylko dla biura).
+    """
+    report = get_object_or_404(ServiceReport, pk=pk)
+
+    # na tym etapie dajemy dostęp tylko biuru
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji protokołu.")
+
+    if request.method == "POST":
+        finalize = "finalize" in request.POST  # kliknięto 'Zatwierdź i nadaj numer'
+
+        form = ServiceReportForm(request.POST, instance=report)
+        if form.is_valid():
+            report = form.save(commit=False)
+
+            if finalize:
+                report.status = ServiceReport.Status.FINAL
+
+            report.save()
+            # po zapisie wracamy do szczegółów zlecenia
+            return redirect("core:workorder_detail", pk=report.work_order.pk)
+    else:
+        form = ServiceReportForm(instance=report)
+
+    context = {
+        "form": form,
+        "report": report,
+        "order": report.work_order,
+    }
+    return render(request, "core/servicereport_form.html", context)
+
+
+@login_required
+def service_report_entry(request, pk):
+    """
+    Wejście do protokołu z poziomu zlecenia:
+    - jeśli protokół istnieje -> otwórz go na froncie,
+    - jeśli nie -> utwórz pusty (szkic) i potem otwórz.
+    """
+    order = get_object_or_404(WorkOrder, pk=pk)
+
+    # biuro + (docelowo) serwisanci
+    if not (is_office(request.user) or is_technician(request.user)):
+        return HttpResponseForbidden("Brak uprawnień do pracy z protokołem.")
+
+    # Na razie pilnujemy, że protokół tylko do zleceń typu SERWIS
+    if order.work_type != WorkOrder.WorkOrderType.SERVICE:
+        return HttpResponseForbidden("Protokół serwisowy dostępny tylko dla zleceń serwisowych.")
+
+    # szukamy istniejącego protokołu
+    report = ServiceReport.objects.filter(work_order=order).first()
+
+    # jeśli nie ma -> tworzymy nowy (status / numer ogarnia model)
+    if report is None:
+        report = ServiceReport.objects.create(work_order=order)
+
+    # teraz zamiast admina -> nasz front
+    return redirect("core:service_report_edit", pk=report.pk)
