@@ -1,0 +1,230 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <style>
+   @page {
+    size: A4;
+    margin: 15mm 12mm;
+  }
+
+  body {
+    font-family: DejaVu,Helvetica, sans-serif;
+    font-size: 9pt;
+    line-height: 1.3;
+  }
+
+  h1 {
+    font-family: DejaVu-Bold, DejaVu,Helvetica, sans-serif;
+    font-size: 14pt;
+    margin: 0 0 3mm 0;
+    
+  }
+
+  .small {
+    font-size: 8pt;
+  }
+
+    .header-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 4mm;
+    }
+
+    .header-table td {
+      vertical-align: top;
+    }
+
+    .header-left {
+      width: 60%;
+    }
+
+    .header-right {
+      width: 40%;
+      text-align: right;
+    }
+
+    .header-logo {
+      margin-bottom: 2mm;
+    }
+
+    .header-object {
+      margin-top: 2mm;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .box-table {
+      margin-top: 2mm;
+      margin-bottom: 2mm;
+    }
+
+    .box-table td {
+      border: 0.5pt solid #000;
+      padding: 2mm 2.5mm;
+    }
+
+    .box-table th {
+      border: 0.5pt solid #000;
+      padding: 1.5mm 2.5mm;
+      text-align: left;
+      font-size: 8pt;
+      background-color: #f4f4f4;
+    }
+
+    .no-border td,
+    .no-border th {
+      border: none;
+    }
+
+    .label-cell {
+      width: 30%;
+      font-family: DejaVu-Bold, DejaVu, Helvetica, sans-serif;
+      font-weight: normal;
+      white-space: nowrap;
+    }
+
+    .value-cell {
+      width: 70%;
+    }
+
+    .section-title {
+      font-family: DejaVu-Bold, DejaVu, Helvetica, sans-serif;
+      font-weight: normal;
+      margin-top: 3mm;
+      margin-bottom: 1mm;
+      font-size: 9pt;
+    }
+
+    .multiline-box {
+      border: 0.5pt solid #000;
+      padding: 2mm 2.5mm;
+      min-height: 18mm;
+    }
+
+    .signatures-table {
+      margin-top: 8mm;
+    }
+
+    .signatures-table td {
+      text-align: center;
+      padding-top: 10mm;
+      font-size: 8pt;
+    }
+
+    .signatures-line {
+      border-top: 0.5pt solid #000;
+      width: 60mm;
+      margin: 0 auto 1mm auto;
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+
+  {# ===== NAGŁÓWEK ===== #}
+  <table class="no-border header-table">
+    <tr>
+      <td class="header-left">
+        {% if logo_path %}
+          <img src="{{ logo_path }}" alt="ALLSEC" class="header-logo" />
+        {% endif %}
+
+        <h1>
+          Protokół serwisowy
+          {% if report.number %} nr: {{ report.number }}{% endif %}
+        </h1>
+
+        <div class="header-object small">
+            <strong>Nazwa obiektu:</strong>
+            {{ order.site.name }}<br/>
+            <strong>Adres obiektu:</strong>
+            {{ order.site.street }}
+            {% if order.site.postcode %}, {{ order.site.postcode }}{% endif %}
+            {{ order.site.city }}<br/><br/>
+            {% if report.requester_name or report.requester_phone %}
+                <span><strong>
+                Zgłaszający:</strong>
+                {% if report.requester_name %}{{ report.requester_name }}{% else %}brak danych{% endif %}
+                {% if report.requester_phone %} ( {{ report.requester_phone }}{% endif %} )
+                </span>
+            {% endif %}
+        </div>
+      </td>
+
+      <td class="header-right">
+        <div class="small" style="margin-bottom: 3mm;">
+          <strong>Data:</strong>
+          {{ report.report_date|date:"d-m-Y" }}
+        </div>
+        <div class="small">
+          <strong>ALLSEC Chmiel Michał</strong><br/>
+          ul. Akacjowa 29/2<br/>
+          83-331 Niestępowo<br/>
+          NIP: 957-082-18-56<br/>
+          <br/>
+          <strong>Tel.: 514-514-236<br/>
+          e-mail: biuro@allsec.pl</br></strong><br/>
+          <strong>Tryb serwisu:</strong>
+          {{ report.get_service_mode_display|default:"" }}<br/>
+          <strong>Forma płatności:</strong>
+          {{ report.get_payment_method_display|default:"" }}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  
+
+  {# ===== OPIS ZGŁOSZENIA / STAN PRZED ===== #}
+  <div class="section-title">Opis zgłoszenia / stan przed</div>
+  <div class="multiline-box">
+    {{ report.description_before|linebreaksbr }}
+  </div>
+
+  {# ===== OPIS WYKONANYCH PRAC ===== #}
+  <div class="section-title">Opis wykonanych prac</div>
+  <div class="multiline-box">
+    {{ report.work_performed|linebreaksbr }}
+  </div>
+
+  {# ===== WYNIK ===== #}
+  <div class="section-title">Wynik</div>
+  <div class="multiline-box">
+    {{ report.get_result_display|default:"" }}
+  </div>
+
+  {# ===== ZALECENIA / DALSZE KROKI ===== #}
+  <div class="section-title">Zalecenia / dalsze kroki</div>
+  <div class="multiline-box">
+    {{ report.next_actions|linebreaksbr }}
+  </div>
+
+  {# ===== PODPISY ===== #}
+  <table class="no-border signatures-table">
+    <tr>
+      <td>
+        <div class="signatures-line"></div>
+        <div>Podpis serwisanta</div>
+        <div class="small">
+          {% if report.technicians %}
+            {{ report.technicians }}
+          {% else %}
+            &nbsp;
+          {% endif %}
+        </div>
+      </td>
+      <td>
+        <div class="signatures-line"></div>
+        <div>Podpis klienta</div>
+      </td>
+    </tr>
+  </table>
+
+</div>
+</body>
+</html>

@@ -126,6 +126,8 @@ class WorkOrderForm(forms.ModelForm):
 
         return cleaned
     
+# core/forms.py
+
 class ServiceReportForm(forms.ModelForm):
     class Meta:
         model = ServiceReport
@@ -144,9 +146,65 @@ class ServiceReportForm(forms.ModelForm):
             "notes_internal",
         ]
         widgets = {
-            "report_date": forms.DateInput(attrs={"type": "date"}),
-            "description_before": forms.Textarea(attrs={"rows": 3}),
-            "work_performed": forms.Textarea(attrs={"rows": 4}),
-            "next_actions": forms.Textarea(attrs={"rows": 3}),
-            "notes_internal": forms.Textarea(attrs={"rows": 3}),
+            "report_date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-sm",
+                }
+            ),
+            "service_mode": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm",
+                }
+            ),
+            "payment_method": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm",
+                }
+            ),
+            "requester_name": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                }
+            ),
+            "requester_phone": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "type": "tel",
+                }
+            ),
+            "description_before": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 3,
+                }
+            ),
+            "work_performed": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 4,
+                }
+            ),
+            "result": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm",
+                }
+            ),
+            "next_actions": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 3,
+                }
+            ),
+            "technicians": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                }
+            ),
+            "notes_internal": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 3,
+                }
+            ),
         }

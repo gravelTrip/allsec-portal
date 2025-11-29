@@ -25,6 +25,11 @@ urlpatterns = [
         views.ajax_site_systems,
         name="ajax_site_systems",
     ),
+    path(
+        "protokoly/<int:pk>/pdf/",
+        views.service_report_pdf,
+        name="service_report_pdf",
+    ),
 ]
 
 

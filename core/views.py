@@ -1,12 +1,16 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.template.loader import render_to_string
 from django.contrib.auth.models import Group
 from django.core.paginator import Paginator
 from django.utils import timezone
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
+
+from weasyprint import HTML
 
 from .models import WorkOrder, Job, System, ServiceReport
 from .forms import WorkOrderForm, ServiceReportForm
+
 
 
 # Create your views here.
@@ -291,3 +295,26 @@ def service_report_entry(request, pk):
 
     # teraz zamiast admina -> nasz front
     return redirect("core:service_report_edit", pk=report.pk)
+
+@login_required
+def service_report_pdf(request, pk):
+    report = get_object_or_404(ServiceReport, pk=pk)
+    order = report.work_order
+
+    logo_path = request.build_absolute_uri('/static/img/logo2-150.jpg')
+
+    html = render_to_string(
+        "core/servicereport_pdf.html",
+        {
+            "report": report,
+            "order": order,
+            "logo_path": logo_path,
+        },
+        request=request,
+    )
+
+    pdf_file = HTML(string=html, base_url=request.build_absolute_uri('/')).write_pdf()
+    filename = (report.number or f"protokol_{report.pk}") + ".pdf"
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
