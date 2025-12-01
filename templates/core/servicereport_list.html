@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Protokoły serwisowe – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Protokoły serwisowe</h1>
+      <p class="text-muted small mb-0">
+        Lista protokołów powiązanych ze zleceniami serwisowymi.
+      </p>
+    </div>
+
+    <form method="get" class="d-flex align-items-center gap-2 mb-0">
+      <div class="form-check form-check-inline ms-2 mb-0" style="white-space: nowrap;">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="only_final"
+          name="only_final"
+          {% if only_final %}checked{% endif %}
+        >
+        <label class="form-check-label small" for="only_final">
+          Tylko zatwierdzone
+        </label>
+      </div>
+
+      <select name="status" class="form-select form-select-sm" style="width: 180px;">
+        <option value="">Status: wszystkie</option>
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if filter_status == value %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="btn btn-sm btn-outline-light">Filtruj</button>
+      <a href="{% url 'core:service_report_list' %}" class="btn btn-sm btn-outline-secondary">Wyczyść</a>
+    </form>
+  </div>
+
+  <div class="card shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Numer</th>
+            <th>Data protokołu</th>
+            <th>Zlecenie</th>
+            <th>Obiekt</th>
+            <th>Status</th>
+            <th>Tryb serwisu</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for report in page_obj %}
+            <tr>
+              <td>
+                {% if report.number %}
+                  {{ report.number }}
+                {% else %}
+                  PS #{{ report.id }}
+                {% endif %}
+              </td>
+              <td>{{ report.report_date|date:"d.m.Y" }}</td>
+              <td>
+                {% if report.work_order %}
+                  {% if report.work_order.number %}
+                    <a href="{% url 'core:workorder_detail' report.work_order.pk %}">
+                      {{ report.work_order.number }}
+                    </a>
+                  {% else %}
+                    <a href="{% url 'core:workorder_detail' report.work_order.pk %}">
+                      Zlecenie #{{ report.work_order.id }}
+                    </a>
+                  {% endif %}
+                {% else %}
+                  –
+                {% endif %}
+              </td>
+              <td>
+                {% if report.work_order and report.work_order.site %}
+                  {{ report.work_order.site.name }}<br>
+                  <span class="small text-muted">
+                    {{ report.work_order.site.city }}
+                  </span>
+                {% else %}
+                  –
+                {% endif %}
+              </td>
+              <td>
+                {% if report.status == 'FINAL' %}
+                  <span class="badge bg-success">Zatwierdzony</span>
+                {% elif report.status == 'DRAFT' %}
+                  <span class="badge bg-secondary">Szkic</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">{{ report.get_status_display }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if report.service_mode %}
+                  {{ report.get_service_mode_display }}
+                {% else %}
+                  –
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a href="{% url 'core:service_report_edit' report.pk %}"
+                   class="btn btn-sm btn-outline-secondary">
+                  Otwórz
+                </a>
+                {# tu zakładam, że masz widok PDF o nazwie core:service_report_pdf #}
+                <a href="{% url 'core:service_report_pdf' report.pk %}"
+                   target="_blank"
+                   class="btn btn-sm btn-outline-primary">
+                  PDF
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted py-4">
+                Brak protokołów do wyświetlenia.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer bg-light py-2">
+        <nav aria-label="Paginacja protokołów">
+          <ul class="pagination pagination-sm mb-0 justify-content-end">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ filter_status }}{% if only_final %}&only_final=on{% endif %}">&laquo;</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&laquo;</span>
+              </li>
+            {% endif %}
+
+            <li class="page-item disabled">
+              <span class="page-link">
+                Strona {{ page_obj.number }} z {{ page_obj.paginator.num_pages }}
+              </span>
+            </li>
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ filter_status }}{% if only_final %}&only_final=on{% endif %}">&raquo;</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">&raquo;</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

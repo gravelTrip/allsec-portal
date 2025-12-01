@@ -138,6 +138,36 @@ def workorder_list(request):
     }
     return render(request, "core/workorder_list.html", context)
 
+
+@login_required
+def service_report_list(request):
+    qs = (
+        ServiceReport.objects
+        .select_related("work_order__site", "work_order")
+        .order_by("-report_date", "-id")
+    )
+
+    status = request.GET.get("status", "")
+    only_final = request.GET.get("only_final") == "on"
+
+    if status:
+        qs = qs.filter(status=status)
+    if only_final:
+        qs = qs.filter(status=ServiceReport.Status.FINAL)
+
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "filter_status": status,
+        "only_final": only_final,
+        "status_choices": ServiceReport.Status.choices,
+    }
+    return render(request, "core/servicereport_list.html", context)
+
+
 @login_required
 def workorder_detail(request, pk):
     order = get_object_or_404(
@@ -291,7 +321,19 @@ def service_report_entry(request, pk):
 
     # jeśli nie ma -> tworzymy nowy (status / numer ogarnia model)
     if report is None:
-        report = ServiceReport.objects.create(work_order=order)
+        tech_name = ""
+        if order.assigned_to:
+            user = order.assigned_to
+            tech_name = (
+                getattr(user, "get_full_name", lambda: "")()
+                or getattr(user, "username", "")
+            )
+
+        report = ServiceReport.objects.create(
+            work_order=order,
+            notes_internal=order.internal_notes or "",
+            technicians=tech_name,
+        )
 
     # teraz zamiast admina -> nasz front
     return redirect("core:service_report_edit", pk=report.pk)

@@ -16,6 +16,7 @@ class WorkOrderForm(forms.ModelForm):
             "work_type",
             "title",
             "description",
+            "internal_notes",
             "site",
             "systems",
             "status",
@@ -59,6 +60,12 @@ class WorkOrderForm(forms.ModelForm):
                     "rows": 4,
                 }
             ),
+            "internal_notes": forms.Textarea(   # <<< NOWE
+            attrs={
+                "class": "form-control form-control-sm",
+                "rows": 3,
+            }
+        ),
         }
 
     def clean_systems(self):

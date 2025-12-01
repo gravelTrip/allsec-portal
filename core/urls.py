@@ -15,6 +15,11 @@ urlpatterns = [
         name="service_report_entry",
     ),
     path(
+        "protokoly/",
+        views.service_report_list,
+        name="service_report_list",
+    ),
+    path(
         "protokoly/<int:pk>/edycja/",
         views.service_report_edit,
         name="service_report_edit",
