@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}System – {{ system }} – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  {# NAGŁÓWEK: tytuł + obiekt + przyciski #}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        {{ system.get_system_type_display }}
+        {% if system.name %}
+          – {{ system.name }}
+        {% endif %}
+      </h1>
+      <p class="mb-0 text-muted small">
+        Obiekt:
+        <a href="{% url 'core:site_detail' site.pk %}"
+           class="text-decoration-underline">
+          {{ site.name }} – {{ site.city }}
+        </a>
+      </p>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'core:site_detail' site.pk %}"
+         class="btn btn-sm btn-outline-secondary">
+        ← Szczegóły obiektu
+      </a>
+
+      {% if can_edit %}
+        <a href="{% url 'core:system_edit' system.pk %}"
+           class="btn btn-sm btn-primary">
+          Edytuj
+        </a>
+        <form method="post"
+              action="{% url 'core:system_delete' system.pk %}"
+              class="d-inline"
+              onsubmit="return confirm('Na pewno usunąć ten system z obiektu?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            Usuń
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {# KARTA 1 – PODSTAWOWE INFORMACJE #}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white">
+      <h6 class="mb-0">Podstawowe informacje</h6>
+    </div>
+    <div class="card-body small">
+      <dl class="row mb-0">
+
+        <dt class="col-sm-3">Typ systemu</dt>
+        <dd class="col-sm-9">
+          {{ system.get_system_type_display }}
+        </dd>
+
+        {% if system.name %}
+          <dt class="col-sm-3">Opis systemu</dt>
+          <dd class="col-sm-9">
+            {{ system.name }}
+          </dd>
+        {% endif %}
+
+        {% if system.manufacturer %}
+          <dt class="col-sm-3">Producent</dt>
+          <dd class="col-sm-9">
+            {{ system.manufacturer }}
+          </dd>
+        {% endif %}
+
+        {% if system.model %}
+          <dt class="col-sm-3">Model / centrala / rejestrator</dt>
+          <dd class="col-sm-9">
+            {{ system.model }}
+          </dd>
+        {% endif %}
+
+        <dt class="col-sm-3">W umowie serwisowej</dt>
+        <dd class="col-sm-9">
+          {% if system.in_service_contract %}
+            <span class="badge bg-success">Tak</span>
+          {% else %}
+            <span class="badge bg-secondary">Nie</span>
+          {% endif %}
+        </dd>
+
+      </dl>
+    </div>
+  </div>
+
+  
+
+  {# KARTA 3 – LOKALIZACJA #}
+  {% if system.location_info %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Lokalizacja urządzeń</h6>
+      </div>
+      <div class="card-body small">
+        <pre class="mb-0" style="white-space: pre-wrap;">{{ system.location_info }}</pre>
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 4 – HASŁA / DOSTĘPY #}
+  {% if system.access_data %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Hasła / dane dostępowe</h6>
+      </div>
+      <div class="card-body small">
+        <pre class="mb-0" style="white-space: pre-wrap;">{{ system.access_data }}</pre>
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 5 – PROCEDURY #}
+  {% if system.procedures %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Procedury testowe / serwisowe</h6>
+      </div>
+      <div class="card-body small">
+        <pre class="mb-0" style="white-space: pre-wrap;">{{ system.procedures }}</pre>
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 6 – NOTATKI TECHNICZNE #}
+  {% if system.notes %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Notatki techniczne</h6>
+      </div>
+      <div class="card-body small">
+        <pre class="mb-0" style="white-space: pre-wrap;">{{ system.notes }}</pre>
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 2 – DATY SERWISOWE #}
+  {% if system.commissioning_date or system.last_modernization_date %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Daty serwisowe</h6>
+      </div>
+      <div class="card-body small">
+        <dl class="row mb-0">
+          {% if system.commissioning_date %}
+            <dt class="col-sm-3">Data uruchomienia</dt>
+            <dd class="col-sm-9">
+              {{ system.commissioning_date|date:"d.m.Y" }}
+            </dd>
+          {% endif %}
+
+          {% if system.last_modernization_date %}
+            <dt class="col-sm-3">Ostatnia modernizacja</dt>
+            <dd class="col-sm-9">
+              {{ system.last_modernization_date|date:"d.m.Y" }}
+            </dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

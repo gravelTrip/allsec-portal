@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Powiązanie kontaktu – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        Powiązanie kontaktu: {{ contact }}
+      </h1>
+      <p class="mb-0 text-muted small">
+        Obiekt:
+        <a href="{% url 'core:site_detail' site.pk %}"
+           class="link-light text-decoration-underline">
+          {{ site.name }} – {{ site.city }}
+        </a>
+      </p>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'core:site_detail' site.pk %}"
+         class="btn btn-sm btn-outline-secondary">
+        ← Szczegóły obiektu
+      </a>
+      {% if can_edit %}
+        <a href="{% url 'core:sitecontact_edit' sitecontact.pk %}"
+           class="btn btn-sm btn-primary">
+          Edytuj
+        </a>
+        <form method="post"
+              action="{% url 'core:sitecontact_delete' sitecontact.pk %}"
+              onsubmit="return confirm('Na pewno usunąć to powiązanie kontaktu z obiektem?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            Usuń
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white">
+      <h6 class="mb-0">Szczegóły powiązania</h6>
+    </div>
+    <div class="card-body small">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Kontakt</dt>
+        <dd class="col-sm-9">
+          <a href="{% url 'core:contact_detail' contact.pk %}"
+             class="link-light text-decoration-underline">
+            {{ contact }}
+          </a>
+        </dd>
+
+        <dt class="col-sm-3">Rola</dt>
+        <dd class="col-sm-9">
+          {{ sitecontact.get_role_display }}
+        </dd>
+
+        <dt class="col-sm-3">Domyślny do powiadomień</dt>
+        <dd class="col-sm-9">
+          {% if sitecontact.is_default_for_notifications %}tak{% else %}nie{% endif %}
+        </dd>
+      </dl>
+    </div>
+  </div>
+{% endblock %}

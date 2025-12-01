@@ -56,6 +56,49 @@ urlpatterns = [
         views.service_report_pdf,
         name="service_report_pdf",
     ),
+     # Systemy na obiekcie
+    path(
+        "obiekty/<int:site_pk>/systemy/nowy/",
+        views.system_create_for_site,
+        name="system_create_for_site",
+    ),
+    path(
+        "systemy/<int:pk>/",
+        views.system_detail,
+        name="system_detail",
+    ),
+    path(
+        "systemy/<int:pk>/edytuj/",
+        views.system_edit,
+        name="system_edit",
+    ),
+    path(
+        "systemy/<int:pk>/usun/",
+        views.system_delete,
+        name="system_delete",
+    ),
+
+    # Powiązane kontakty (SiteContact)
+    path(
+        "obiekty/<int:site_pk>/powiazane-kontakty/nowy/",
+        views.sitecontact_create,
+        name="sitecontact_create",
+    ),
+    path(
+        "powiazane-kontakty/<int:pk>/",
+        views.sitecontact_detail,
+        name="sitecontact_detail",
+    ),
+    path(
+        "powiazane-kontakty/<int:pk>/edytuj/",
+        views.sitecontact_edit,
+        name="sitecontact_edit",
+    ),
+    path(
+        "powiazane-kontakty/<int:pk>/usun/",
+        views.sitecontact_delete,
+        name="sitecontact_delete",
+    ),
 ]
 
 

@@ -16,6 +16,7 @@ from .models import (
     Site,
     Manager,
     Contact,
+    SiteContact,
 )
 from .forms import (
     WorkOrderForm,
@@ -23,7 +24,8 @@ from .forms import (
     SiteForm,
     ManagerForm,
     ContactForm,
-    SystemFormSet,
+    SystemForm,
+    SiteContactForm,
 )
 
 
@@ -286,6 +288,168 @@ def site_detail(request, pk):
     }
     return render(request, "core/site_detail.html", context)
 
+@login_required
+def system_create_for_site(request, site_pk):
+    site = get_object_or_404(Site, pk=site_pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do dodawania systemów.")
+
+    if request.method == "POST":
+        form = SystemForm(request.POST)
+        if form.is_valid():
+            system = form.save(commit=False)
+            system.site = site
+            system.save()
+            return redirect("core:site_detail", pk=site.pk)
+    else:
+        form = SystemForm()
+
+    context = {
+        "form": form,
+        "site": site,
+        "system": None,
+    }
+    return render(request, "core/system_form.html", context)
+
+
+@login_required
+def system_detail(request, pk):
+    system = get_object_or_404(
+        System.objects.select_related("site"), pk=pk
+    )
+
+    # Używamy formularza tylko po to, żeby mieć listę pól + etykiety
+    form = SystemForm(instance=system)
+
+    context = {
+        "system": system,
+        "site": system.site,
+        "can_edit": is_office(request.user),
+        "form": form,
+    }
+    return render(request, "core/system_detail.html", context)
+
+
+@login_required
+def system_edit(request, pk):
+    system = get_object_or_404(System, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji systemów.")
+
+    if request.method == "POST":
+        form = SystemForm(request.POST, instance=system)
+        if form.is_valid():
+            form.save()
+            return redirect("core:site_detail", pk=system.site.pk)
+    else:
+        form = SystemForm(instance=system)
+
+    context = {
+        "form": form,
+        "system": system,
+        "site": system.site,
+    }
+    return render(request, "core/system_form.html", context)
+
+
+@login_required
+def system_delete(request, pk):
+    system = get_object_or_404(System, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania systemów.")
+
+    site_pk = system.site.pk
+
+    if request.method == "POST":
+        system.delete()
+        return redirect("core:site_detail", pk=site_pk)
+
+    # Przy GET wracamy do szczegółów systemu – można też od razu do obiektu
+    return redirect("core:system_detail", pk=pk)
+
+
+@login_required
+def sitecontact_create(request, site_pk):
+    site = get_object_or_404(Site, pk=site_pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do dodawania powiązań kontaktów.")
+
+    if request.method == "POST":
+        form = SiteContactForm(request.POST)
+        if form.is_valid():
+            sc = form.save(commit=False)
+            sc.site = site
+            sc.save()
+            return redirect("core:site_detail", pk=site.pk)
+    else:
+        form = SiteContactForm()
+
+    context = {
+        "form": form,
+        "site": site,
+        "sitecontact": None,
+    }
+    return render(request, "core/sitecontact_form.html", context)
+
+
+@login_required
+def sitecontact_detail(request, pk):
+    sc = get_object_or_404(
+        SiteContact.objects.select_related("site", "contact"), pk=pk
+    )
+
+    context = {
+        "sitecontact": sc,
+        "site": sc.site,
+        "contact": sc.contact,
+        "can_edit": is_office(request.user),
+    }
+    return render(request, "core/sitecontact_detail.html", context)
+
+
+@login_required
+def sitecontact_edit(request, pk):
+    sc = get_object_or_404(SiteContact, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji powiązania kontaktu.")
+
+    if request.method == "POST":
+        form = SiteContactForm(request.POST, instance=sc)
+        if form.is_valid():
+            form.save()
+            return redirect("core:site_detail", pk=sc.site.pk)
+    else:
+        form = SiteContactForm(instance=sc)
+
+    context = {
+        "form": form,
+        "sitecontact": sc,
+        "site": sc.site,
+        "contact": sc.contact,
+    }
+    return render(request, "core/sitecontact_form.html", context)
+
+
+@login_required
+def sitecontact_delete(request, pk):
+    sc = get_object_or_404(SiteContact, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania powiązania kontaktu.")
+
+    site_pk = sc.site.pk
+
+    if request.method == "POST":
+        sc.delete()
+        return redirect("core:site_detail", pk=site_pk)
+
+    return redirect("core:sitecontact_detail", pk=pk)
+
 
 @login_required
 def site_create(request):
@@ -316,30 +480,16 @@ def site_edit(request, pk):
 
     if request.method == "POST":
         form = SiteForm(request.POST, instance=site)
-        system_formset = SystemFormSet(
-            request.POST,
-            instance=site,
-            prefix="systems",
-        )
 
-        if form.is_valid() and system_formset.is_valid():
-            site = form.save()
-            system_formset.instance = site
-            system_formset.save()
+        if form.is_valid():
+            form.save()
             return redirect("core:site_detail", pk=site.pk)
     else:
         form = SiteForm(instance=site)
-        system_formset = SystemFormSet(
-            instance=site,
-            prefix="systems",
-        )
-
     context = {
         "form": form,
-        "system_formset": system_formset,
         "site": site,
         "is_edit": True,
-        "can_edit": True,
     }
     return render(request, "core/site_form.html", context)
 

@@ -1,12 +1,12 @@
 from django import forms
-from django.forms import inlineformset_factory
 from .models import (
     WorkOrder,
     System,
     ServiceReport,
     Site,
-    Manager,
     Contact,
+    SiteContact,
+    Manager,
 )
 
 
@@ -319,46 +319,40 @@ class ContactForm(forms.ModelForm):
             ),
         }
 
-class SystemInlineForm(forms.ModelForm):
+class BootstrapModelForm(forms.ModelForm):
+    """Bazowy ModelForm, który dorzuca klasy Bootstrap do pól."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            widget = field.widget
+            existing = widget.attrs.get("class", "")
+            # Tekstowe / selecty
+            if isinstance(
+                widget,
+                (
+                    forms.TextInput,
+                    forms.Textarea,
+                    forms.EmailInput,
+                    forms.URLInput,
+                    forms.NumberInput,
+                    forms.DateInput,
+                    forms.Select,
+                ),
+            ):
+                widget.attrs["class"] = (existing + " form-control form-control-sm").strip()
+            # Checkboxy
+            elif isinstance(widget, forms.CheckboxInput):
+                widget.attrs["class"] = (existing + " form-check-input").strip()
+
+class SystemForm(BootstrapModelForm):
     class Meta:
         model = System
-        fields = [
-            "system_type",
-            "name",
-            "manufacturer",
-            "model",
-            "in_service_contract",
-            "location_info",
-        ]
-        widgets = {
-            "system_type": forms.Select(
-                attrs={"class": "form-select form-select-sm"}
-            ),
-            "name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "manufacturer": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "model": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "in_service_contract": forms.CheckboxInput(
-                attrs={"class": "form-check-input"}
-            ),
-            "location_info": forms.Textarea(
-                attrs={
-                    "class": "form-control form-control-sm",
-                    "rows": 1,
-                }
-            ),
-        }
+        # Pole 'site' ustawiamy z widoku (nie pokazujemy w formularzu)
+        exclude = ["site"]
 
-
-SystemFormSet = inlineformset_factory(
-    parent_model=Site,
-    model=System,
-    form=SystemInlineForm,
-    extra=1,          # zawsze jeden pusty wiersz „na nowy system”
-    can_delete=True,  # checkbox DELETE do usuwania istniejących
-)
+class SiteContactForm(BootstrapModelForm):
+    class Meta:
+        model = SiteContact
+        # 'site' też ustawiamy z widoku
+        exclude = ["site"]
