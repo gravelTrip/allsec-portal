@@ -49,50 +49,60 @@
     <!-- MAIN LAYOUT -->
     <div class="container-fluid">
       <div class="row">
-        <!-- LEFT SIDEBAR -->
-        {% with url_name=request.resolver_match.url_name|default:"" %}
-        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark text-white sidebar collapse">
+       <!-- LEWY SIDEBAR -->
+        <nav id="sidebar" class="col-md-2 col-lg-2 d-md-block bg-dark text-white sidebar collapse">
           <div class="position-sticky pt-3">
-            <ul class="nav flex-column">
-              <li class="nav-item">
-                <a class="nav-link text-white {% if url_name == 'dashboard' %}active{% endif %}" {% if url_name == 'dashboard' %}aria-current="page"{% endif %} href="{% url 'core:dashboard' %}">
-                  Dashboard
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white {% if url_name|slice:':9' == 'workorder' %}active{% endif %}" {% if url_name|slice:':9' == 'workorder' %}aria-current="page"{% endif %} href="{% url 'core:workorder_list' %}">
-                  Zlecenia
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white {% if url_name|slice:':14' == 'service_report' %}active{% endif %}" {% if url_name|slice:':14' == 'service_report' %}aria-current="page"{% endif %} href="{% url 'core:service_report_list' %}">
-                  Protokoły
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="{% url 'core:site_list' %}">
-                  <span class="me-2">🏢</span> Obiekty
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="{% url 'core:contact_list' %}">
-                  <span class="me-2">👥</span> Kontakty
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="{% url 'core:manager_list' %}">
-                  <span class="me-2">🏢</span> Zarządcy
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="#">
-                  <span class="me-2">📊</span> Raporty
-                </a>
-              </li>
-            </ul>
+            {% with url_name=request.resolver_match.url_name %}
+              <ul class="nav flex-column">
+
+                <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name == 'dashboard' %}active{% endif %}"
+                     href="{% url 'core:dashboard' %}">
+                    Dashboard
+                  </a>
+                </li>
+
+                <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name and 'workorder' in url_name %}active{% endif %}"
+                     href="{% url 'core:workorder_list' %}">
+                    Zlecenia
+                  </a>
+                </li>
+
+                <li class="nav-item">
+                  {# jak będziesz miał listę protokołów, podmień href na odpowiedni URL #}
+                  <a class="nav-link sidebar-link {% if url_name and 'service_report' in url_name %}active{% endif %}"
+                     href=#>
+                    Protokoły serwisowe
+                  </a>
+                </li>
+
+                <li class="nav-item">
+                  {# zakładam, że widoki obiektów/systemów mają w nazwie site_ albo system_ #}
+                  <a class="nav-link sidebar-link {% if url_name and 'site_' in url_name or url_name and 'system_' in url_name %}active{% endif %}"
+                    href="{% url 'core:site_list' %}">
+                    Obiekty
+                  </a>
+                </li>
+
+                <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name and 'manager_' in url_name %}active{% endif %}"
+                    href="{% url 'core:manager_list' %}">
+                    Zarządcy
+                  </a>
+                </li>
+
+                <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name and 'contact_' in url_name %}active{% endif %}"
+                    href="{% url 'core:contact_list' %}">
+                    Kontakty
+                  </a>
+                </li>
+
+              </ul>
+            {% endwith %}
           </div>
         </nav>
-        {% endwith %}
 
         <!-- RIGHT CONTENT -->
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
