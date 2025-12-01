@@ -14,12 +14,12 @@
       crossorigin="anonymous"
     >
 
-    <!-- Nasz styl (później rozbudujemy) -->
+    <!-- Nasz styl (do rozbudowy) -->
     <link rel="stylesheet" href="{% static 'css/main.css' %}">
   </head>
   <body class="bg-light">
 
-    <!-- GÓRNY PASEK -->
+    <!-- TOP BAR -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
         <a class="navbar-brand fw-bold" href="{% url 'core:dashboard' %}">
@@ -46,43 +46,45 @@
       </div>
     </nav>
 
-    <!-- GŁÓWNY LAYOUT -->
+    <!-- MAIN LAYOUT -->
     <div class="container-fluid">
       <div class="row">
-        <!-- LEWY SIDEBAR -->
+        <!-- LEFT SIDEBAR -->
+        {% with url_name=request.resolver_match.url_name|default:"" %}
         <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark text-white sidebar collapse">
           <div class="position-sticky pt-3">
             <ul class="nav flex-column">
               <li class="nav-item">
-                <a class="nav-link text-white active" aria-current="page" href="{% url 'core:dashboard' %}">
-                  <span class="me-2">🏠</span> Dashboard
+                <a class="nav-link text-white {% if url_name == 'dashboard' %}active{% endif %}" {% if url_name == 'dashboard' %}aria-current="page"{% endif %} href="{% url 'core:dashboard' %}">
+                  Dashboard
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link text-white" href="{% url 'core:workorder_list' %}">
-                  <span class="me-2">🛠️</span> Zlecenia
+                <a class="nav-link text-white {% if url_name|slice:':9' == 'workorder' %}active{% endif %}" {% if url_name|slice:':9' == 'workorder' %}aria-current="page"{% endif %} href="{% url 'core:workorder_list' %}">
+                  Zlecenia
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link text-white" href="{% url 'core:service_report_list' %}">
-                  <span class="me-2">📄</span> Protokoły
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="#">
-                  <span class="me-2">🏢</span> Obiekty
+                <a class="nav-link text-white {% if url_name|slice:':14' == 'service_report' %}active{% endif %}" {% if url_name|slice:':14' == 'service_report' %}aria-current="page"{% endif %} href="{% url 'core:service_report_list' %}">
+                  Protokoły
                 </a>
               </li>
               <li class="nav-item">
                 <a class="nav-link text-white" href="#">
-                  <span class="me-2">📊</span> Raporty
+                  Obiekty
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="#">
+                  Raporty
                 </a>
               </li>
             </ul>
           </div>
         </nav>
+        {% endwith %}
 
-        <!-- PRAWA CZĘŚĆ – CONTENT -->
+        <!-- RIGHT CONTENT -->
         <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
           {% block content %}
           <!-- Tutaj wchodzą konkretne strony -->

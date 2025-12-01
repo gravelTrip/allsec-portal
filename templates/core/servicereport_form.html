@@ -135,9 +135,37 @@
               {{ form.description_before }}
             </div>
 
-            <div class="mb-2">
-              <label class="form-label small">Opis wykonanych prac</label>
+            <div class="mb-3">
+              <label class="form-label small" for="{{ form.work_performed.id_for_label }}">
+                Historia wizyt / wykonane prace
+              </label>
+
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <small class="text-muted">
+                  Dopisuj kolejne wizyty w formacie: „Wizyta 1 – 28.11.2025 – Jan Kowalski”
+                </small>
+                <button type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        id="add-visit-entry">
+                  Dodaj wpis wizyty
+                </button>
+              </div>
+
               {{ form.work_performed }}
+
+              <div class="form-text small">
+                Przykład:
+                <br>
+                Wizyta 1 – 28.11.2025 – Jan Kowalski<br>
+                – Wykonano diagnostykę...<br>
+                – Stwierdzono uszkodzenie modułu...
+              </div>
+
+              {% if form.work_performed.errors %}
+                <div class="text-danger small mt-1">
+                  {{ form.work_performed.errors|striptags }}
+                </div>
+              {% endif %}
             </div>
 
             <div class="mb-2">
@@ -185,4 +213,54 @@
       </form>
     </div>
   </div>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const btn = document.getElementById("add-visit-entry");
+    if (!btn) return;
+
+    const textarea = document.getElementById("id_work_performed");
+    if (!textarea) return;
+
+    // Imię/nazwisko technika – z modelu (jeśli jest)
+    const defaultTech = "{{ report.technicians|default_if_none:''|escapejs }}";
+
+    btn.addEventListener("click", function () {
+      let value = textarea.value || "";
+
+      // Szukamy istniejących "Wizyta X" i wyciągamy największy numer
+      const regex = /Wizyta\s+(\d+)/g;
+      let maxVisit = 0;
+      let match;
+      while ((match = regex.exec(value)) !== null) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxVisit) {
+          maxVisit = num;
+        }
+      }
+      const nextVisit = maxVisit + 1;
+
+      // Dzisiejsza data w formacie dd.mm.rrrr
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, "0");
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const yyyy = today.getFullYear();
+      const dateStr = dd + "." + mm + "." + yyyy;
+
+      const tech = defaultTech || "";
+
+      const prefix = value.trim().length > 0 ? "\n\n" : "";
+      const newBlock =
+        prefix +
+        "Wizyta " + nextVisit + " – " + dateStr +
+        (tech ? " – " + tech : "") +
+        "\n– ";
+
+      textarea.value = value + newBlock;
+      textarea.focus();
+      // przesuwamy kursor na koniec
+      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    });
+  });
+</script>
+
 {% endblock %}
