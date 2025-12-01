@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Zarządca {{ manager.short_name|default:manager.full_name }} – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        {{ manager.short_name|default:manager.full_name }}
+      </h1>
+      <p class="mb-0 text-muted small">
+        {% if manager.street %}
+          {{ manager.street }}, 
+        {% endif %}
+        {{ manager.postal_code }} {{ manager.city }}
+      </p>
+      {% if manager.nip %}
+        <p class="mb-0 text-muted small">
+          NIP: {{ manager.nip }}
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'core:manager_list' %}"
+         class="btn btn-sm btn-outline-secondary">
+        ← Lista zarządców
+      </a>
+      {% if can_edit %}
+        <a href="{% url 'core:manager_edit' manager.pk %}"
+           class="btn btn-sm btn-primary">
+          Edytuj
+        </a>
+        <form method="post"
+              action="{% url 'core:manager_delete' manager.pk %}"
+              onsubmit="return confirm('Na pewno usunąć tego zarządcę?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            Usuń
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      {% if manager.notes %}
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">Notatki</h6>
+          </div>
+          <div class="card-body small">
+            <pre class="mb-0" style="white-space: pre-wrap;">{{ manager.notes }}</pre>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Obiekty tego zarządcy</h6>
+        </div>
+        <div class="card-body small">
+          {% if sites %}
+            <ul class="mb-0">
+              {% for site in sites %}
+                <li>
+                  <a href="{% url 'core:site_detail' site.pk %}">
+                    {{ site.name }}
+                  </a>
+                  <span class="text-muted small">
+                    – {{ site.city }}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted small mb-0">Brak obiektów powiązanych.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Kontakty u zarządcy</h6>
+        </div>
+        <div class="card-body small">
+          {% if contacts %}
+            <ul class="mb-0">
+              {% for contact in contacts %}
+                <li>
+                  <a href="{% url 'core:contact_detail' contact.pk %}">
+                    {{ contact }}
+                  </a>
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted small mb-0">Brak zdefiniowanych kontaktów.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

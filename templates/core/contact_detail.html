@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Kontakt {{ contact }} – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">{{ contact }}</h1>
+      {% if contact.manager %}
+        <p class="mb-0 text-muted small">
+          Zarządca:
+          <a href="{% url 'core:manager_detail' contact.manager.pk %}"
+             class="link-light text-decoration-underline">
+            {{ contact.manager.short_name|default:contact.manager.full_name }}
+          </a>
+        </p>
+      {% endif %}
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+      <a href="{% url 'core:contact_list' %}"
+         class="btn btn-sm btn-outline-secondary">
+        ← Lista kontaktów
+      </a>
+      {% if can_edit %}
+        <a href="{% url 'core:contact_edit' contact.pk %}"
+           class="btn btn-sm btn-primary">
+          Edytuj
+        </a>
+        <form method="post"
+              action="{% url 'core:contact_delete' contact.pk %}"
+              onsubmit="return confirm('Na pewno usunąć ten kontakt?');">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            Usuń
+          </button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Dane kontaktowe</h6>
+        </div>
+        <div class="card-body small">
+          <div class="mb-1">
+            <span class="text-muted">Imię i nazwisko:</span>
+            {{ contact.first_name }} {{ contact.last_name }}
+          </div>
+          <div class="mb-1">
+            <span class="text-muted">Telefon:</span>
+            {% if contact.phone %}{{ contact.phone }}{% else %}<span class="text-muted">brak</span>{% endif %}
+          </div>
+          <div class="mb-1">
+            <span class="text-muted">E-mail:</span>
+            {% if contact.email %}{{ contact.email }}{% else %}<span class="text-muted">brak</span>{% endif %}
+          </div>
+          {% if contact.manager %}
+            <div class="mb-1">
+              <span class="text-muted">Zarządca:</span>
+              {{ contact.manager.short_name|default:contact.manager.full_name }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if contact.notes %}
+        <div class="card shadow-sm border-0 mb-3">
+          <div class="card-header bg-white">
+            <h6 class="mb-0">Notatki</h6>
+          </div>
+          <div class="card-body small">
+            <pre class="mb-0" style="white-space: pre-wrap;">{{ contact.notes }}</pre>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm border-0 mb-3">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Powiązane obiekty</h6>
+        </div>
+        <div class="card-body small">
+          {% if site_links %}
+            <ul class="mb-0">
+              {% for link in site_links %}
+                <li>
+                  <a href="{% url 'core:site_detail' link.site.pk %}">
+                    {{ link.site.name }}
+                  </a>
+                  <span class="text-muted">
+                    – {{ link.get_role_display }}
+                  </span>
+                  {% if link.is_default_for_notifications %}
+                    <span class="badge bg-primary ms-1">domyślny</span>
+                  {% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted small mb-0">
+              Ten kontakt nie jest jeszcze przypisany do żadnego obiektu.
+            </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

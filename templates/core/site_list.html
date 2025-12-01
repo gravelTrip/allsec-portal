@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Obiekty – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Obiekty</h1>
+      <p class="text-muted small mb-0">
+        Lista obiektów, na których prowadzimy serwis i przeglądy.
+      </p>
+    </div>
+
+    {% if can_create %}
+      <a href="{% url 'core:site_create' %}" class="btn btn-primary btn-sm">
+        + Nowy obiekt
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <table class="table table-hover mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Nazwa</th>
+            <th>Adres</th>
+            <th>Dane fakturowe</th>
+            <th>Zarządca</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if sites %}
+            {% for site in sites %}
+              <tr>
+                <td>{{ site.name }}</td>
+                <td>
+                  {% if site.street %}
+                    {{ site.street }}<br>
+                  {% endif %}
+                  <span class="text-muted small">
+                    {{ site.postal_code }} {{ site.city }}
+                  </span>
+                </td>
+                <td>
+                  {% if site.entity %}
+                    {{ site.entity.short_name|default:site.entity.name }}
+                  {% else %}
+                    <span class="text-muted small">brak</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if site.manager %}
+                    {{ site.manager.short_name|default:site.manager.full_name }}
+                  {% else %}
+                    <span class="text-muted small">brak</span>
+                  {% endif %}
+                </td>
+                <td class="text-end">
+                  <a href="{% url 'core:site_detail' site.pk %}"
+                     class="btn btn-sm btn-primary">
+                    Szczegóły
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted small py-4">
+                Brak obiektów w bazie.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer bg-white border-0">
+        <nav aria-label="Paginacja obiektów">
+          <ul class="pagination pagination-sm mb-0 justify-content-end">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">«</span>
+              </li>
+            {% endif %}
+
+            {% for num in paginator.page_range %}
+              {% if num == page_obj.number %}
+                <li class="page-item active" aria-current="page">
+                  <span class="page-link">{{ num }}</span>
+                </li>
+              {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">»</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

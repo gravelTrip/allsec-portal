@@ -1,5 +1,13 @@
 from django import forms
-from .models import WorkOrder, System, ServiceReport
+from django.forms import inlineformset_factory
+from .models import (
+    WorkOrder,
+    System,
+    ServiceReport,
+    Site,
+    Manager,
+    Contact,
+)
 
 
 class WorkOrderForm(forms.ModelForm):
@@ -215,3 +223,142 @@ class ServiceReportForm(forms.ModelForm):
                 }
             ),
         }
+class SiteForm(forms.ModelForm):
+    class Meta:
+        model = Site
+        fields = [
+            "entity",
+            "manager",
+            "name",
+            "site_type",
+            "street",
+            "postal_code",
+            "city",
+            "google_maps_url",
+            "access_info",
+            "technical_notes",
+        ]
+        widgets = {
+            "entity": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "manager": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "site_type": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "street": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "postal_code": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "city": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "google_maps_url": forms.URLInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "access_info": forms.Textarea(
+                attrs={"class": "form-control form-control-sm", "rows": 3}
+            ),
+            "technical_notes": forms.Textarea(
+                attrs={"class": "form-control form-control-sm", "rows": 3}
+            ),
+        }
+
+
+class ManagerForm(forms.ModelForm):
+    class Meta:
+        model = Manager
+        fields = [
+            "short_name",
+            "full_name",
+            "nip",
+            "street",
+            "postal_code",
+            "city",
+            "notes",
+        ]
+        widgets = {
+            "short_name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "full_name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "nip": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "street": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "postal_code": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "city": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "notes": forms.Textarea(
+                attrs={"class": "form-control form-control-sm", "rows": 3}
+            ),
+        }
+
+
+class ContactForm(forms.ModelForm):
+    class Meta:
+        model = Contact
+        fields = [
+            "first_name",
+            "last_name",
+            "phone",
+            "email",
+            "manager",
+            "notes",
+        ]
+        widgets = {
+            "first_name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "last_name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "phone": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "email": forms.EmailInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "manager": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "notes": forms.Textarea(
+                attrs={"class": "form-control form-control-sm", "rows": 3}
+            ),
+        }
+
+class SystemInlineForm(forms.ModelForm):
+    class Meta:
+        model = System
+        fields = [
+            "system_type",
+            "name",
+            "manufacturer",
+            "model",
+            "in_service_contract",
+            "location_info",
+        ]
+        widgets = {
+            "system_type": forms.Select(
+                attrs={"class": "form-select form-select-sm"}
+            ),
+            "name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "manufacturer": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "model": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "in_service_contract": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
+            ),
+            "location_info": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 1,
+                }
+            ),
+        }
+
+
+SystemFormSet = inlineformset_factory(
+    parent_model=Site,
+    model=System,
+    form=SystemInlineForm,
+    extra=1,          # zawsze jeden pusty wiersz „na nowy system”
+    can_delete=True,  # checkbox DELETE do usuwania istniejących
+)

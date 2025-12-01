@@ -8,8 +8,23 @@ from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 
 from weasyprint import HTML
 
-from .models import WorkOrder, Job, System, ServiceReport
-from .forms import WorkOrderForm, ServiceReportForm
+from .models import (
+    WorkOrder,
+    Job,
+    System,
+    ServiceReport,
+    Site,
+    Manager,
+    Contact,
+)
+from .forms import (
+    WorkOrderForm,
+    ServiceReportForm,
+    SiteForm,
+    ManagerForm,
+    ContactForm,
+    SystemFormSet,
+)
 
 
 
@@ -232,6 +247,301 @@ def workorder_edit(request, pk):
     }
     return render(request, "core/workorder_form.html", context)
 
+# =========================
+# OBIEKTY (Site)
+# =========================
+@login_required
+def site_list(request):
+    qs = Site.objects.select_related("entity", "manager").order_by("name")
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "sites": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "can_create": is_office(request.user),
+    }
+    return render(request, "core/site_list.html", context)
+
+
+@login_required
+def site_detail(request, pk):
+    site = get_object_or_404(
+        Site.objects.select_related("entity", "manager").prefetch_related(
+            "systems", "site_contacts__contact"
+        ),
+        pk=pk,
+    )
+
+    systems = site.systems.all().order_by("system_type", "name")
+    site_contacts = site.site_contacts.select_related("contact").all().order_by("role")
+
+    context = {
+        "site": site,
+        "systems": systems,
+        "site_contacts": site_contacts,
+        "can_edit": is_office(request.user),
+    }
+    return render(request, "core/site_detail.html", context)
+
+
+@login_required
+def site_create(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do tworzenia obiektów.")
+
+    if request.method == "POST":
+        form = SiteForm(request.POST)
+        if form.is_valid():
+            site = form.save()
+            return redirect("core:site_detail", pk=site.pk)
+    else:
+        form = SiteForm()
+
+    context = {
+        "form": form,
+        "site": None,
+    }
+    return render(request, "core/site_form.html", context)
+
+
+@login_required
+def site_edit(request, pk):
+    site = get_object_or_404(Site, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji obiektu.")
+
+    if request.method == "POST":
+        form = SiteForm(request.POST, instance=site)
+        system_formset = SystemFormSet(
+            request.POST,
+            instance=site,
+            prefix="systems",
+        )
+
+        if form.is_valid() and system_formset.is_valid():
+            site = form.save()
+            system_formset.instance = site
+            system_formset.save()
+            return redirect("core:site_detail", pk=site.pk)
+    else:
+        form = SiteForm(instance=site)
+        system_formset = SystemFormSet(
+            instance=site,
+            prefix="systems",
+        )
+
+    context = {
+        "form": form,
+        "system_formset": system_formset,
+        "site": site,
+        "is_edit": True,
+        "can_edit": True,
+    }
+    return render(request, "core/site_form.html", context)
+
+
+@login_required
+def site_delete(request, pk):
+    site = get_object_or_404(Site, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania obiektu.")
+
+    if request.method == "POST":
+        site.delete()
+        return redirect("core:site_list")
+
+    # jeśli GET – wróć do szczegółów
+    return redirect("core:site_detail", pk=pk)
+
+
+# =========================
+# ZARZĄDCY (Manager)
+# =========================
+@login_required
+def manager_list(request):
+    qs = Manager.objects.order_by("short_name", "full_name")
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "managers": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "can_create": is_office(request.user),
+    }
+    return render(request, "core/manager_list.html", context)
+
+
+@login_required
+def manager_detail(request, pk):
+    manager = get_object_or_404(
+        Manager.objects.prefetch_related("sites", "contacts"),
+        pk=pk,
+    )
+
+    context = {
+        "manager": manager,
+        "sites": manager.sites.all().order_by("name"),
+        "contacts": manager.contacts.all().order_by("last_name", "first_name"),
+        "can_edit": is_office(request.user),
+    }
+    return render(request, "core/manager_detail.html", context)
+
+
+@login_required
+def manager_create(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do tworzenia zarządców.")
+
+    if request.method == "POST":
+        form = ManagerForm(request.POST)
+        if form.is_valid():
+            manager = form.save()
+            return redirect("core:manager_detail", pk=manager.pk)
+    else:
+        form = ManagerForm()
+
+    context = {
+        "form": form,
+        "manager": None,
+    }
+    return render(request, "core/manager_form.html", context)
+
+
+@login_required
+def manager_edit(request, pk):
+    manager = get_object_or_404(Manager, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji zarządcy.")
+
+    if request.method == "POST":
+        form = ManagerForm(request.POST, instance=manager)
+        if form.is_valid():
+            manager = form.save()
+            return redirect("core:manager_detail", pk=manager.pk)
+    else:
+        form = ManagerForm(instance=manager)
+
+    context = {
+        "form": form,
+        "manager": manager,
+    }
+    return render(request, "core/manager_form.html", context)
+
+
+@login_required
+def manager_delete(request, pk):
+    manager = get_object_or_404(Manager, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania zarządcy.")
+
+    if request.method == "POST":
+        manager.delete()
+        return redirect("core:manager_list")
+
+    return redirect("core:manager_detail", pk=pk)
+
+
+# =========================
+# KONTAKTY (Contact)
+# =========================
+@login_required
+def contact_list(request):
+    qs = Contact.objects.select_related("manager").order_by("last_name", "first_name")
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "contacts": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "can_create": is_office(request.user),
+    }
+    return render(request, "core/contact_list.html", context)
+
+
+@login_required
+def contact_detail(request, pk):
+    contact = get_object_or_404(
+        Contact.objects.select_related("manager").prefetch_related(
+            "site_links__site"
+        ),
+        pk=pk,
+    )
+
+    site_links = contact.site_links.select_related("site").all()
+
+    context = {
+        "contact": contact,
+        "site_links": site_links,
+        "can_edit": is_office(request.user),
+    }
+    return render(request, "core/contact_detail.html", context)
+
+
+@login_required
+def contact_create(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do tworzenia kontaktów.")
+
+    if request.method == "POST":
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            contact = form.save()
+            return redirect("core:contact_detail", pk=contact.pk)
+    else:
+        form = ContactForm()
+
+    context = {
+        "form": form,
+        "contact": None,
+    }
+    return render(request, "core/contact_form.html", context)
+
+
+@login_required
+def contact_edit(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji kontaktu.")
+
+    if request.method == "POST":
+        form = ContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            contact = form.save()
+            return redirect("core:contact_detail", pk=contact.pk)
+    else:
+        form = ContactForm(instance=contact)
+
+    context = {
+        "form": form,
+        "contact": contact,
+    }
+    return render(request, "core/contact_form.html", context)
+
+
+@login_required
+def contact_delete(request, pk):
+    contact = get_object_or_404(Contact, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania kontaktu.")
+
+    if request.method == "POST":
+        contact.delete()
+        return redirect("core:contact_list")
+
+    return redirect("core:contact_detail", pk=pk)
 
 @login_required
 def ajax_site_systems(request, site_id):

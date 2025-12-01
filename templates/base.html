@@ -70,13 +70,23 @@
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link text-white" href="#">
-                  Obiekty
+                <a class="nav-link text-white" href="{% url 'core:site_list' %}">
+                  <span class="me-2">🏢</span> Obiekty
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="{% url 'core:contact_list' %}">
+                  <span class="me-2">👥</span> Kontakty
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-white" href="{% url 'core:manager_list' %}">
+                  <span class="me-2">🏢</span> Zarządcy
                 </a>
               </li>
               <li class="nav-item">
                 <a class="nav-link text-white" href="#">
-                  Raporty
+                  <span class="me-2">📊</span> Raporty
                 </a>
               </li>
             </ul>

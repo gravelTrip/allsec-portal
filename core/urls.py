@@ -25,6 +25,27 @@ urlpatterns = [
         name="service_report_edit",
     ),
 
+    # Obiekty
+    path("obiekty/", views.site_list, name="site_list"),
+    path("obiekty/nowy/", views.site_create, name="site_create"),
+    path("obiekty/<int:pk>/", views.site_detail, name="site_detail"),
+    path("obiekty/<int:pk>/edytuj/", views.site_edit, name="site_edit"),
+    path("obiekty/<int:pk>/usun/", views.site_delete, name="site_delete"),
+
+    # Kontakty
+    path("kontakty/", views.contact_list, name="contact_list"),
+    path("kontakty/nowy/", views.contact_create, name="contact_create"),
+    path("kontakty/<int:pk>/", views.contact_detail, name="contact_detail"),
+    path("kontakty/<int:pk>/edytuj/", views.contact_edit, name="contact_edit"),
+    path("kontakty/<int:pk>/usun/", views.contact_delete, name="contact_delete"),
+
+    # Zarządcy
+    path("zarzadcy/", views.manager_list, name="manager_list"),
+    path("zarzadcy/nowy/", views.manager_create, name="manager_create"),
+    path("zarzadcy/<int:pk>/", views.manager_detail, name="manager_detail"),
+    path("zarzadcy/<int:pk>/edytuj/", views.manager_edit, name="manager_edit"),
+    path("zarzadcy/<int:pk>/usun/", views.manager_delete, name="manager_delete"),
+
     path(
         "ajax/site/<int:site_id>/systems/",
         views.ajax_site_systems,
