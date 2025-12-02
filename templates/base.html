@@ -72,7 +72,7 @@
                 <li class="nav-item">
                   {# jak będziesz miał listę protokołów, podmień href na odpowiedni URL #}
                   <a class="nav-link sidebar-link {% if url_name and 'service_report' in url_name %}active{% endif %}"
-                     href=#>
+                    href="{% url 'core:service_report_list' %}">
                     Protokoły serwisowe
                   </a>
                 </li>
