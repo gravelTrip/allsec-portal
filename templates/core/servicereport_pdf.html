@@ -205,26 +205,63 @@
     {{ report.next_actions|linebreaksbr }}
   </div>
 
-  {# ===== PODPISY ===== #}
-  <table class="no-border signatures-table">
-    <tr>
-      <td>
-        <div class="signatures-line"></div>
-        <div>Podpis serwisanta</div>
-        <div class="small">
-          {% if report.technicians %}
-            {{ report.technicians }}
-          {% else %}
-            &nbsp;
-          {% endif %}
-        </div>
-      </td>
-      <td>
-        <div class="signatures-line"></div>
-        <div>Podpis klienta</div>
-      </td>
-    </tr>
-  </table>
+  {# ===== POZYCJE PROTOKOŁU – ZESTAWIENIE ===== #}
+  {% if items %}
+    <h2 class="section-title" style="margin-top: 10mm; font-size: 11pt;">
+      Pozycje protokołu serwisowego
+    </h2>
+
+    <table class="box-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-top: 2mm;">
+      <thead>
+        <tr>
+          <th style="width: 5%;  padding: 4px; border: 1px solid #000;">Lp.</th>
+          <th style="width: 45%; padding: 4px; border: 1px solid #000;">Opis pozycji</th>
+          <th style="width: 8%;  padding: 4px; border: 1px solid #000; text-align: right;">Ilość</th>
+          <th style="width: 8%;  padding: 4px; border: 1px solid #000;">Jm</th>
+          <th style="width: 17%; padding: 4px; border: 1px solid #000; text-align: right;">Cena jedn. netto</th>
+          <th style="width: 17%; padding: 4px; border: 1px solid #000; text-align: right;">Wartość netto</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td style="padding: 3px; border: 1px solid #000; text-align: center;">
+              {{ forloop.counter }}
+            </td>
+            <td style="padding: 3px; border: 1px solid #000;">
+              {{ item.description|default_if_none:"" }}
+            </td>
+            <td style="padding: 3px; border: 1px solid #000; text-align: right;">
+              {{ item.quantity|default_if_none:"" }}
+            </td>
+            <td style="padding: 3px; border: 1px solid #000;">
+              {{ item.unit|default_if_none:"" }}
+            </td>
+            <td style="padding: 3px; border: 1px solid #000; text-align: right;">
+              {{ item.unit_price|default_if_none:"" }}
+            </td>
+            <td style="padding: 3px; border: 1px solid #000; text-align: right;">
+              {{ item.total_price|default_if_none:"" }}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" style="padding: 3px; border: 1px solid #000; text-align: right; font-weight: bold;">
+            Razem netto:
+          </td>
+          <td style="padding: 3px; border: 1px solid #000; text-align: right; font-weight: bold;">
+            {{ items_total }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+  {% else %}
+    <p style="margin-top: 10mm; font-size: 9pt;">
+      Brak pozycji rozliczeniowych na protokole.
+    </p>
+  {% endif %}
 
 </div>
 </body>

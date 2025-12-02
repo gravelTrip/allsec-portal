@@ -1,4 +1,5 @@
 from django import forms
+from django.forms import inlineformset_factory
 from .models import (
     WorkOrder,
     System,
@@ -7,6 +8,7 @@ from .models import (
     Contact,
     SiteContact,
     Manager,
+    ServiceReportItem,
 )
 
 
@@ -223,6 +225,15 @@ class ServiceReportForm(forms.ModelForm):
                 }
             ),
         }
+
+ServiceReportItemFormSet = inlineformset_factory(
+    ServiceReport,
+    ServiceReportItem,
+    fields=["description", "quantity", "unit", "unit_price", "total_price"],
+    extra=0,           # ile pustych wierszy ma być domyślnie
+    can_delete=True,
+)
+
 class SiteForm(forms.ModelForm):
     class Meta:
         model = Site

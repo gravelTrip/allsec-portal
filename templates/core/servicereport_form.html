@@ -190,6 +190,146 @@
             </div>
           </div>
         </div>
+          
+
+  {# ===== KARTA: POZYCJE PROTOKOŁU / ROZLICZENIE ===== #}
+  <div class="card shadow-sm border-0 mt-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Pozycje protokołu / rozliczenie</h6>
+      <small class="text-muted">
+        Pozycje edytowane tylko przez biuro
+      </small>
+    </div>
+    <div class="card-body small">
+      <div class="card-body">
+  {% if item_formset.non_form_errors %}
+    <div class="alert alert-danger small">
+      {{ item_formset.non_form_errors }}
+    </div>
+  {% endif %}
+
+      {{ item_formset.management_form }}
+
+      <div class="table-responsive">
+        <table class="table table-sm table-borderless align-middle mb-0">
+          <thead>
+            <tr class="border-bottom">
+              <th style="width: 3rem;">Lp.</th>
+              <th>Opis pozycji</th>
+              <th style="width: 6rem;">Ilość</th>
+              <th style="width: 5rem;">Jm</th>
+              <th style="width: 8rem;">Cena jedn. netto</th>
+              <th style="width: 8rem;">Wartość netto</th>
+              <th style="width: 4rem;" class="text-center">Usuń</th>
+            </tr>
+          </thead>
+
+          {# AKTUALNE WIERSZE #}
+          <tbody id="items-table-body">
+            {% for item_form in item_formset.forms %}
+              <tr class="border-bottom item-row">
+                <td>
+                  {{ forloop.counter }}
+                  {{ item_form.id }}
+                </td>
+                <td>
+                  {{ item_form.description.errors }}
+                  {{ item_form.description }}
+                </td>
+                <td>
+                  {{ item_form.quantity.errors }}
+                  {{ item_form.quantity }}
+                </td>
+                <td>
+                  {{ item_form.unit.errors }}
+                  {{ item_form.unit }}
+                </td>
+                <td>
+                  {{ item_form.unit_price.errors }}
+                  {{ item_form.unit_price }}
+                </td>
+                <td>
+                  {{ item_form.total_price.errors }}
+                  {{ item_form.total_price }}
+                </td>
+                <td class="text-center">
+                  {{ item_form.DELETE }}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+
+          {# SZABLON PUSTEGO WIERSZA – używany w JS, niewidoczny #}
+          <tbody id="empty-item-form" class="d-none">
+            <tr class="border-bottom item-row">
+              <td>
+                __lp__
+                {{ item_formset.empty_form.id }}
+              </td>
+              <td>
+                {{ item_formset.empty_form.description.errors }}
+                {{ item_formset.empty_form.description }}
+              </td>
+              <td>
+                {{ item_formset.empty_form.quantity.errors }}
+                {{ item_formset.empty_form.quantity }}
+              </td>
+              <td>
+                {{ item_formset.empty_form.unit.errors }}
+                {{ item_formset.empty_form.unit }}
+              </td>
+              <td>
+                {{ item_formset.empty_form.unit_price.errors }}
+                {{ item_formset.empty_form.unit_price }}
+              </td>
+              <td>
+                {{ item_formset.empty_form.total_price.errors }}
+                {{ item_formset.empty_form.total_price }}
+              </td>
+              <td class="text-center">
+                {{ item_formset.empty_form.DELETE }}
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot>
+            <tr class="border-top">
+              <th colspan="5" class="text-end">
+                Razem netto:
+              </th>
+              <th>
+                <span id="items-total-display">
+                  {{ items_total|default:"0.00" }}
+                </span>
+              </th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <div class="d-flex gap-2">
+          <button type="button"
+                  class="btn btn-sm btn-success"
+                  id="add-item-row">
+            + Dodaj pozycję
+          </button>
+
+          <button type="button"
+                  class="btn btn-sm btn-outline-danger"
+                  id="delete-selected-rows">
+            Usuń pozycje
+          </button>
+        </div>
+
+        <p class="mb-0 text-muted small">
+          Zmiany w pozycjach zostaną zapisane po kliknięciu „Zapisz protokół”.
+        </p>
+      </div>
+    </div>
+  </div>
+
 
         <div class="mt-3 d-flex justify-content-end gap-2">
           <a href="{% url 'core:workorder_detail' order.pk %}"
@@ -215,52 +355,206 @@
   </div>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-    const btn = document.getElementById("add-visit-entry");
-    if (!btn) return;
+    // =========================
+    // 1) Przycisk "Dodaj wpis wizyty"
+    // =========================
+    const visitBtn = document.getElementById("add-visit-entry");
+    const visitTextarea = document.getElementById("id_work_performed");
 
-    const textarea = document.getElementById("id_work_performed");
-    if (!textarea) return;
+    if (visitBtn && visitTextarea) {
+      const defaultTech = "{{ report.technicians|default_if_none:''|escapejs }}";
 
-    // Imię/nazwisko technika – z modelu (jeśli jest)
-    const defaultTech = "{{ report.technicians|default_if_none:''|escapejs }}";
+      visitBtn.addEventListener("click", function () {
+        let value = visitTextarea.value || "";
 
-    btn.addEventListener("click", function () {
-      let value = textarea.value || "";
-
-      // Szukamy istniejących "Wizyta X" i wyciągamy największy numer
-      const regex = /Wizyta\s+(\d+)/g;
-      let maxVisit = 0;
-      let match;
-      while ((match = regex.exec(value)) !== null) {
-        const num = parseInt(match[1], 10);
-        if (!isNaN(num) && num > maxVisit) {
-          maxVisit = num;
+        // Szukamy istniejących "Wizyta X" i wyciągamy największy numer
+        const regex = /Wizyta\s+(\d+)/g;
+        let maxVisit = 0;
+        let match;
+        while ((match = regex.exec(value)) !== null) {
+          const num = parseInt(match[1], 10);
+          if (!isNaN(num) && num > maxVisit) {
+            maxVisit = num;
+          }
         }
+        const nextVisit = maxVisit + 1;
+
+        // Dzisiejsza data w formacie dd.mm.rrrr
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, "0");
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const yyyy = today.getFullYear();
+        const dateStr = dd + "." + mm + "." + yyyy;
+
+        const tech = defaultTech || "";
+
+        const prefix = value.trim().length > 0 ? "\n\n" : "";
+        const newBlock =
+          prefix +
+          "Wizyta " + nextVisit + " – " + dateStr +
+          (tech ? " – " + tech : "") +
+          "\n– ";
+
+        visitTextarea.value = value + newBlock;
+        visitTextarea.focus();
+        visitTextarea.selectionStart = visitTextarea.selectionEnd = visitTextarea.value.length;
+      });
+    }
+
+    // =========================
+    // 2) Pozycje protokołu – dynamiczny formset
+    // =========================
+    const itemsBody = document.getElementById("items-table-body");
+    const emptyFormTbody = document.getElementById("empty-item-form");
+    const addItemBtn = document.getElementById("add-item-row");
+    const deleteSelectedBtn = document.getElementById("delete-selected-rows");
+
+    // znalezienie inputa TOTAL_FORMS niezależnie od prefiksu
+    const totalFormsInput = document.querySelector('input[name$="-TOTAL_FORMS"]');
+
+    if (!itemsBody || !emptyFormTbody || !totalFormsInput) {
+      return;  // coś jest nie tak z formsetem – nie odpalamy logiki
+    }
+
+    const emptyRowTemplate = emptyFormTbody.querySelector("tr");
+
+    function parseNumber(val) {
+      if (!val) return 0;
+      const v = parseFloat(String(val).replace(",", "."));
+      return isNaN(v) ? 0 : v;
+    }
+
+    function recalcRowTotal(row) {
+      const qtyInput = row.querySelector('input[name*="-quantity"]');
+      const unitPriceInput = row.querySelector('input[name*="-unit_price"]');
+      const totalInput = row.querySelector('input[name*="-total_price"]');
+      if (!qtyInput || !unitPriceInput || !totalInput) return;
+
+      const qty = parseNumber(qtyInput.value);
+      const price = parseNumber(unitPriceInput.value);
+      const sum = qty * price;
+      totalInput.value = sum ? sum.toFixed(2) : "";
+    }
+
+    function recalcItemsTotal() {
+      let total = 0;
+      itemsBody.querySelectorAll("tr").forEach(function (row) {
+        if (row.classList.contains("d-none")) return;
+
+        const deleteCheckbox = row.querySelector('input[type="checkbox"]');
+        if (deleteCheckbox && deleteCheckbox.checked) {
+          // zaznaczone do usunięcia – nie liczymy
+          return;
+        }
+
+        const totalInput = row.querySelector('input[name*="-total_price"]');
+        if (totalInput && totalInput.value) {
+          total += parseNumber(totalInput.value);
+        }
+      });
+
+      const totalDisplay = document.getElementById("items-total-display");
+      if (totalDisplay) {
+        totalDisplay.textContent = total.toFixed(2);
       }
-      const nextVisit = maxVisit + 1;
+    }
 
-      // Dzisiejsza data w formacie dd.mm.rrrr
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, "0");
-      const mm = String(today.getMonth() + 1).padStart(2, "0");
-      const yyyy = today.getFullYear();
-      const dateStr = dd + "." + mm + "." + yyyy;
+    function reindexLp() {
+      const rows = itemsBody.querySelectorAll("tr");
+      rows.forEach(function (row, index) {
+        const firstCell = row.querySelector("td");
+        if (!firstCell) return;
+        const node = firstCell.firstChild;
+        if (node && node.nodeType === Node.TEXT_NODE) {
+          node.nodeValue = (index + 1) + " ";
+        }
+      });
+    }
 
-      const tech = defaultTech || "";
+    function bindRowEvents(row) {
+      const qtyInput = row.querySelector('input[name*="-quantity"]');
+      const unitPriceInput = row.querySelector('input[name*="-unit_price"]');
+      const deleteCheckbox = row.querySelector('input[type="checkbox"]');
 
-      const prefix = value.trim().length > 0 ? "\n\n" : "";
-      const newBlock =
-        prefix +
-        "Wizyta " + nextVisit + " – " + dateStr +
-        (tech ? " – " + tech : "") +
-        "\n– ";
+      if (qtyInput) {
+        qtyInput.addEventListener("input", function () {
+          recalcRowTotal(row);
+          recalcItemsTotal();
+        });
+      }
+      if (unitPriceInput) {
+        unitPriceInput.addEventListener("input", function () {
+          recalcRowTotal(row);
+          recalcItemsTotal();
+        });
+      }
+      if (deleteCheckbox) {
+        deleteCheckbox.addEventListener("change", function () {
+          // tylko kolor, realne usunięcie robi przycisk "Usuń pozycje"
+          if (deleteCheckbox.checked) {
+            row.classList.add("table-danger");
+          } else {
+            row.classList.remove("table-danger");
+          }
+          recalcItemsTotal();
+        });
+      }
+    }
 
-      textarea.value = value + newBlock;
-      textarea.focus();
-      // przesuwamy kursor na koniec
-      textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+    // Podpinamy zdarzenia do istniejących wierszy
+    itemsBody.querySelectorAll("tr").forEach(function (row) {
+      bindRowEvents(row);
+      recalcRowTotal(row);
     });
+    recalcItemsTotal();
+    reindexLp();
+
+    if (addItemBtn) {
+      addItemBtn.addEventListener("click", function () {
+        const index = parseInt(totalFormsInput.value, 10) || 0;
+        const newRow = emptyRowTemplate.cloneNode(true);
+
+        // podmieniamy __prefix__ na numer formularza
+        const html = newRow.innerHTML.replace(/__prefix__/g, index);
+        newRow.innerHTML = html;
+
+        totalFormsInput.value = index + 1;
+
+        // nowy wiersz nie ma jeszcze PK – traktujemy jak "nowy"
+        newRow.dataset.isNew = "1";
+
+        itemsBody.appendChild(newRow);
+        bindRowEvents(newRow);
+        reindexLp();
+      });
+    }
+
+    if (deleteSelectedBtn) {
+      deleteSelectedBtn.addEventListener("click", function () {
+        const rows = Array.from(itemsBody.querySelectorAll("tr"));
+
+        rows.forEach(function (row) {
+          const deleteCheckbox = row.querySelector('input[type="checkbox"]');
+          if (!deleteCheckbox || !deleteCheckbox.checked) return;
+
+          const idInput = row.querySelector('input[name*="-id"]');
+
+          if (idInput && idInput.value) {
+            // istniejąca pozycja – chowamy wiersz, checkbox DELETE zostaje zaznaczony
+            row.classList.add("d-none");
+          } else {
+            // nowy wiersz – fizycznie usuwamy z DOM, ale NIE zmieniamy TOTAL_FORMS
+            // (może być prościej: zamiast usuwać z DOM, tylko go chowamy)
+            row.classList.add("d-none");
+          }
+        });
+
+        reindexLp();
+        recalcItemsTotal();
+      });
+    }
   });
 </script>
+
 
 {% endblock %}

@@ -5,6 +5,7 @@ from django.contrib.auth.models import Group
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
+from django.db.models import Sum
 
 from weasyprint import HTML
 
@@ -26,6 +27,7 @@ from .forms import (
     ContactForm,
     SystemForm,
     SiteContactForm,
+    ServiceReportItemFormSet,
 )
 
 
@@ -726,37 +728,38 @@ def ajax_site_systems(request, site_id):
 
 @login_required
 def service_report_edit(request, pk):
-    """
-    Edycja protokołu serwisowego na froncie (na razie tylko dla biura).
-    """
-    report = get_object_or_404(ServiceReport, pk=pk)
-
-    # na tym etapie dajemy dostęp tylko biuru
-    if not is_office(request.user):
-        return HttpResponseForbidden("Brak uprawnień do edycji protokołu.")
+    report = get_object_or_404(ServiceReport.objects.select_related("work_order__site"), pk=pk)
+    order = report.work_order
+    site = order.site if order else None
 
     if request.method == "POST":
-        finalize = "finalize" in request.POST  # kliknięto 'Zatwierdź i nadaj numer'
-
         form = ServiceReportForm(request.POST, instance=report)
-        if form.is_valid():
-            report = form.save(commit=False)
+        item_formset = ServiceReportItemFormSet(request.POST, instance=report)
 
-            if finalize:
-                report.status = ServiceReport.Status.FINAL
-
-            report.save()
-            # po zapisie wracamy do szczegółów zlecenia
-            return redirect("core:workorder_detail", pk=report.work_order.pk)
+        if form.is_valid() and item_formset.is_valid():
+            form.save()
+            item_formset.save()
+            return redirect("core:workorder_detail", pk=order.pk)
     else:
         form = ServiceReportForm(instance=report)
+        item_formset = ServiceReportItemFormSet(instance=report)
+
+    # suma netto istniejących pozycji (po zapisaniu zmian)
+    items_total = (
+        report.items.aggregate(total=Sum("total_price"))["total"]
+        or 0
+    )
 
     context = {
-        "form": form,
         "report": report,
-        "order": report.work_order,
+        "order": order,
+        "site": site,
+        "form": form,
+        "item_formset": item_formset,
+        "items_total": items_total,
     }
     return render(request, "core/servicereport_form.html", context)
+
 
 
 @login_required
@@ -803,6 +806,10 @@ def service_report_pdf(request, pk):
     report = get_object_or_404(ServiceReport, pk=pk)
     order = report.work_order
 
+     # wszystkie pozycje + suma netto
+    items = report.items.all()
+    items_total = items.aggregate(total=Sum("total_price"))["total"] or 0
+
     logo_path = request.build_absolute_uri('/static/img/logo2-150.jpg')
 
     html = render_to_string(
@@ -811,6 +818,8 @@ def service_report_pdf(request, pk):
             "report": report,
             "order": order,
             "logo_path": logo_path,
+            "items": items,
+            "items_total": items_total,
         },
         request=request,
     )
