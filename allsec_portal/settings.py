@@ -23,9 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-v%6^#qtok5r67j&#^mt+)f6idn#%+0n6v115d4-g86vx-tt%3d'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["app.allsec.pl"]
+CSRF_TRUSTED_ORIGINS = ["https://app.allsec.pl"]
 
 
 # Application definition
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -109,23 +111,28 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'pl-pl'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "Europe/Warsaw"
 
 USE_I18N = True
 
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+from pathlib import Path
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-STATIC_URL = 'static/'
+STATIC_URL = "/static/"
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise – serwowanie statyk z poziomu aplikacji
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -135,3 +142,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "core:dashboard"
 LOGOUT_REDIRECT_URL = "login"
+
+# --- Nadpiski środowiskowe (nie w repo) ---
+try:
+    from .local_settings import *
+except ImportError:
+    pass

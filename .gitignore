@@ -16,3 +16,4 @@ db.sqlite3
 # Systemowe
 .DS_Store
 Thumbs.db
+allsec_portal/local_settings.py
