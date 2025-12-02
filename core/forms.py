@@ -78,6 +78,18 @@ class WorkOrderForm(forms.ModelForm):
         ),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        assigned_field = self.fields.get("assigned_to")
+        if assigned_field is not None:
+            # etykieta: "Imię Nazwisko" albo login, jeśli brak imienia/nazwiska
+            def label_for_user(user):
+                full_name = f"{user.first_name} {user.last_name}".strip()
+                return full_name or user.username
+
+            assigned_field.label_from_instance = label_for_user
+
     def clean_systems(self):
         systems = self.cleaned_data.get("systems")
         site = self.cleaned_data.get("site")
