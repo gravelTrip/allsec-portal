@@ -92,7 +92,16 @@
                   {{ order.created_at|date:"d.m.Y" }}
                 </td>
                 <td>{{ order.title }}</td>
-                <td>{{ order.site.name }}</td>
+                <td>
+                  {% if order.site %}
+                    {{ order.site.name }}<br>
+                    <span class="small text-muted">
+                      {{ order.site.city }}
+                    </span>
+                  {% else %}
+                    &#8212;
+                  {% endif %}
+                </td>
                 <td>
                   {% if order.work_type == order.WorkOrderType.SERVICE %}
                     <span class="badge bg-danger">Serwis</span>
