@@ -157,8 +157,6 @@ class ServiceReportForm(forms.ModelForm):
             "requester_phone",
             "description_before",
             "work_performed",
-            "result",
-            "next_actions",
             "technicians",
             "notes_internal",
         ]
@@ -200,17 +198,6 @@ class ServiceReportForm(forms.ModelForm):
                 attrs={
                     "class": "form-control form-control-sm",
                     "rows": 4,
-                }
-            ),
-            "result": forms.Select(
-                attrs={
-                    "class": "form-select form-select-sm",
-                }
-            ),
-            "next_actions": forms.Textarea(
-                attrs={
-                    "class": "form-control form-control-sm",
-                    "rows": 3,
                 }
             ),
             "technicians": forms.TextInput(

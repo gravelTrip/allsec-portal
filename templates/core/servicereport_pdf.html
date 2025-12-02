@@ -193,18 +193,6 @@
     {{ report.work_performed|linebreaksbr }}
   </div>
 
-  {# ===== WYNIK ===== #}
-  <div class="section-title">Wynik</div>
-  <div class="multiline-box">
-    {{ report.get_result_display|default:"" }}
-  </div>
-
-  {# ===== ZALECENIA / DALSZE KROKI ===== #}
-  <div class="section-title">Zalecenia / dalsze kroki</div>
-  <div class="multiline-box">
-    {{ report.next_actions|linebreaksbr }}
-  </div>
-
   {# ===== POZYCJE PROTOKOŁU – ZESTAWIENIE ===== #}
   {% if items %}
     <h2 class="section-title" style="margin-top: 10mm; font-size: 11pt;">
