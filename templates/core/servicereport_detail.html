@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Protokół serwisowy
+  {% if report.number %}
+    {{ report.number }}
+  {% else %}
+    #{{ report.id }}
+  {% endif %}
+  – ALLSEC Portal
+{% endblock %}
+
+{% block content %}
+  {# NAGŁÓWEK: tytuł + zlecenie + przyciski #}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        Protokół serwisowy
+        {% if report.number %}
+          – {{ report.number }}
+        {% else %}
+          #{{ report.id }}
+        {% endif %}
+      </h1>
+      <p class="mb-0 text-muted small">
+        {% if order %}
+          Zlecenie:
+          {% if order.number %}
+            {{ order.number }} – 
+          {% endif %}
+          {{ order.title }}
+        {% else %}
+          Brak powiązanego zlecenia.
+        {% endif %}
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{% url 'core:service_report_list' %}"
+         class="btn btn-sm btn-outline-secondary">
+        &larr; Powrót do listy
+      </a>
+
+      {% if order %}
+        <a href="{% url 'core:workorder_detail' order.pk %}"
+           class="btn btn-sm btn-outline-secondary">
+          Zobacz zlecenie
+        </a>
+      {% endif %}
+
+      <a href="{% url 'core:service_report_pdf' report.pk %}"
+         target="_blank"
+         class="btn btn-sm btn-outline-secondary">
+        PDF
+      </a>
+
+      {% if can_edit %}
+        <a href="{% url 'core:service_report_edit' report.pk %}"
+           class="btn btn-sm btn-primary">
+          Edytuj protokół
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  {# KARTA 1 – PODSTAWOWE INFORMACJE #}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white">
+      <h6 class="mb-0">Podstawowe informacje o protokole</h6>
+    </div>
+    <div class="card-body">
+      <dl class="row mb-0 small">
+        <dt class="col-sm-3 text-muted">Numer protokołu</dt>
+        <dd class="col-sm-9">
+          {% if report.number %}
+            {{ report.number }}
+          {% else %}
+            <span class="text-muted">brak (szkic)</span>
+          {% endif %}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Data protokołu</dt>
+        <dd class="col-sm-9">
+          {{ report.report_date|date:"d.m.Y"|default:"—" }}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Status</dt>
+        <dd class="col-sm-9">
+          {% if report.status == 'FINAL' %}
+            <span class="badge bg-success">Zatwierdzony</span>
+          {% elif report.status == 'DRAFT' %}
+            <span class="badge bg-secondary">Szkic</span>
+          {% else %}
+            {{ report.get_status_display }}
+          {% endif %}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Tryb serwisu</dt>
+        <dd class="col-sm-9">
+          {{ report.get_service_mode_display|default:"—" }}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Forma płatności</dt>
+        <dd class="col-sm-9">
+          {{ report.get_payment_method_display|default:"—" }}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Osoba zgłaszająca</dt>
+        <dd class="col-sm-9">
+          {% if report.requester_name %}
+            {{ report.requester_name }}
+            {% if report.requester_phone %}
+              <span class="text-muted">({{ report.requester_phone }})</span>
+            {% endif %}
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </dd>
+
+        <dt class="col-sm-3 text-muted">Serwisanci</dt>
+        <dd class="col-sm-9">
+          {{ report.technicians|default:"—" }}
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  {# KARTA 2 – ZLECENIE I OBIEKT #}
+  {% if order %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Zlecenie i obiekt</h6>
+      </div>
+      <div class="card-body small">
+        <p class="mb-1">
+          <span class="text-muted">Zlecenie:</span>
+          {% if order.number %}
+            {{ order.number }} –
+          {% endif %}
+          {{ order.title }}
+        </p>
+        <p class="mb-1">
+          <span class="text-muted">Typ zlecenia:</span>
+          {{ order.get_work_type_display }}
+        </p>
+        {% if site %}
+          <p class="mb-0">
+            <span class="text-muted">Obiekt:</span>
+            {{ site.name }}
+            {% if site.city %}
+              <span class="text-muted">– {{ site.city }}</span>
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 3 – OPIS ZGŁOSZENIA / STAN PRZED #}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white">
+      <h6 class="mb-0">Opis zgłoszenia / stan przed</h6>
+    </div>
+    <div class="card-body small">
+      {% if report.description_before %}
+        <div class="multiline-preserve">
+          {{ report.description_before|linebreaksbr }}
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Brak opisu zgłoszenia.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# KARTA 4 – OPIS WYKONANYCH PRAC #}
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-header bg-white">
+      <h6 class="mb-0">Opis wykonanych prac</h6>
+    </div>
+    <div class="card-body small">
+      {% if report.work_performed %}
+        <div class="multiline-preserve">
+          {{ report.work_performed|linebreaksbr }}
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Brak opisu wykonanych prac.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# KARTA 5 – NOTATKI WEWNĘTRZNE #}
+  {% if report.notes_internal %}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Notatki wewnętrzne (tylko dla nas)</h6>
+      </div>
+      <div class="card-body small">
+        <div class="multiline-preserve">
+          {{ report.notes_internal|linebreaksbr }}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  {# KARTA 6 – POZYCJE PROTOKOŁU / ROZLICZENIE #}
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <h6 class="mb-0">Pozycje protokołu – zestawienie</h6>
+      <span class="small text-muted">
+        Suma netto:
+        <strong>{{ items_total|default:0 }}</strong>
+      </span>
+    </div>
+    <div class="card-body p-0">
+      {% if items %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0 align-middle">
+            <thead class="table-light">
+              <tr class="small text-muted">
+                <th style="width: 4%;">Lp.</th>
+                <th>Opis</th>
+                <th style="width: 10%;" class="text-end">Ilość</th>
+                <th style="width: 10%;">Jm</th>
+                <th style="width: 12%;" class="text-end">Cena jedn. netto</th>
+                <th style="width: 14%;" class="text-end">Wartość netto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in items %}
+                <tr class="small">
+                  <td>{{ forloop.counter }}</td>
+                  <td>{{ item.description }}</td>
+                  <td class="text-end">
+                    {{ item.quantity|default:"—" }}
+                  </td>
+                  <td>
+                    {{ item.get_unit_display|default:"—" }}
+                  </td>
+                  <td class="text-end">
+                    {{ item.unit_price|default:"—" }}
+                  </td>
+                  <td class="text-end">
+                    {{ item.total_price|default:"—" }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr class="small fw-semibold">
+                <td colspan="5" class="text-end">Suma netto:</td>
+                <td class="text-end">{{ items_total|default:0 }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      {% else %}
+        <div class="p-3">
+          <p class="text-muted small mb-0">
+            Brak pozycji rozliczeniowych na tym protokole.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

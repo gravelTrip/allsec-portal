@@ -739,7 +739,7 @@ def service_report_edit(request, pk):
         if form.is_valid() and item_formset.is_valid():
             form.save()
             item_formset.save()
-            return redirect("core:workorder_detail", pk=order.pk)
+            return redirect("core:service_report_detail", pk=report.pk)
     else:
         form = ServiceReportForm(instance=report)
         item_formset = ServiceReportItemFormSet(instance=report)
@@ -799,7 +799,31 @@ def service_report_entry(request, pk):
         )
 
     # teraz zamiast admina -> nasz front
-    return redirect("core:service_report_edit", pk=report.pk)
+    return redirect("core:service_report_detail", pk=report.pk)
+
+def service_report_detail(request, pk):
+    report = get_object_or_404(
+        ServiceReport.objects.select_related("work_order__site", "work_order"),
+        pk=pk,
+    )
+    order = report.work_order
+    site = order.site if order else None
+
+    # wszystkie pozycje + suma netto
+    items = report.items.all()
+    items_total = items.aggregate(total=Sum("total_price"))["total"] or 0
+
+    context = {
+        "report": report,
+        "order": order,
+        "site": site,
+        "items": items,
+        "items_total": items_total,
+        # Edytować mogą biuro + serwisanci (jak przy wejściu przez zlecenie)
+        "can_edit": is_office(request.user) or is_technician(request.user),
+    }
+    return render(request, "core/servicereport_detail.html", context)
+
 
 @login_required
 def service_report_pdf(request, pk):

@@ -117,13 +117,13 @@
                     {% endif %}
                   </td>
                   <td class="text-end">
-                    <a href="{% url 'core:service_report_edit' report.pk %}"
-                       class="btn btn-sm btn-primary">
-                      Otw&#243;rz
+                    <a href="{% url 'core:service_report_detail' report.pk %}"
+                      class="btn btn-sm btn-primary">
+                      Szczegóły
                     </a>
                     <a href="{% url 'core:service_report_pdf' report.pk %}"
-                       target="_blank"
-                       class="btn btn-sm btn-outline-secondary">
+                      target="_blank"
+                      class="btn btn-sm btn-outline-secondary">
                       PDF
                     </a>
                   </td>
