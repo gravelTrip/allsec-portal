@@ -323,4 +323,105 @@
     })();
   </script>
 
+  <script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.TomSelect) {
+      return;
+    }
+
+    const siteElement = document.getElementById('id_site');
+    const requestedElement = document.getElementById('id_requested_by');
+
+    let requestedTom = null;
+    let siteTom = null;
+
+    // Osoba zgłaszająca – Tom Select
+    if (requestedElement) {
+      requestedTom = new TomSelect(requestedElement, {
+        create: false,
+        allowEmptyOption: true,
+        sortField: {
+          field: 'text',
+          direction: 'asc'
+        },
+        plugins: ['clear_button'],
+        placeholder: 'Wybierz osobę zgłaszającą...'
+      });
+
+      // Jeśli to nowe zlecenie (brak wartości) – na start czyścimy opcje,
+      // żeby nie ładować całej listy wszystkich kontaktów
+      if (!requestedTom.getValue()) {
+        requestedTom.clearOptions();
+      }
+    }
+
+    // Funkcja: załaduj kontakty dla danego obiektu
+    function loadContactsForSite(siteId) {
+      if (!requestedTom) {
+        return;
+      }
+
+      // Brak obiektu – czyścimy pole
+      if (!siteId) {
+        requestedTom.clear();
+        requestedTom.clearOptions();
+        return;
+      }
+
+      const currentValue = requestedTom.getValue();
+
+      fetch(`/ajax/sites/${siteId}/contacts/`)
+        .then(response => response.json())
+        .then(data => {
+          const results = data.results || [];
+
+          requestedTom.clear();
+          requestedTom.clearOptions();
+          requestedTom.addOptions(results);
+          requestedTom.refreshOptions(false);
+
+          // Jeśli wcześniej coś było wybrane i nadal jest w liście – przywróć
+          if (currentValue) {
+            const exists = results.some(
+              opt => String(opt.value) === String(currentValue)
+            );
+            if (exists) {
+              requestedTom.setValue(currentValue);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Błąd ładowania kontaktów dla obiektu', err);
+        });
+    }
+
+    // Obiekt – Tom Select + podpięcie change
+    if (siteElement) {
+      siteTom = new TomSelect(siteElement, {
+        create: false,
+        allowEmptyOption: true,
+        sortField: {
+          field: 'text',
+          direction: 'asc'
+        },
+        plugins: ['clear_button'],
+        placeholder: 'Wybierz obiekt...'
+      });
+
+      // Przy zmianie obiektu przeładuj osoby zgłaszające
+      siteTom.on('change', function (value) {
+        loadContactsForSite(value);
+      });
+
+      // Jeśli edytujemy istniejące zlecenie i obiekt już jest ustawiony –
+      // dograj od razu kontakty dla tego obiektu
+      const initialSiteId = siteTom.getValue();
+      if (initialSiteId) {
+        loadContactsForSite(initialSiteId);
+      }
+    }
+  });
+</script>
+
+
 {% endblock %}

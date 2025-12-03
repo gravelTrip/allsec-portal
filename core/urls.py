@@ -112,6 +112,13 @@ urlpatterns = [
         views.sitecontact_delete,
         name="sitecontact_delete",
     ),
+
+    # AJAX – kontakty dla obiektu
+    path(
+        "ajax/sites/<int:site_id>/contacts/",
+        views.site_contacts_json,
+        name="site_contacts_json",
+    ),
 ]
 
 

@@ -943,3 +943,36 @@ def entity_delete(request, pk):
         return redirect("core:entity_list")
 
     return redirect("core:entity_detail", pk=pk)
+
+@login_required
+def site_contacts_json(request, site_id):
+    """
+    Zwraca kontakty powiązane z danym obiektem (Site) w formacie pod Tom Select.
+    """
+    site = get_object_or_404(Site, pk=site_id)
+
+    site_contacts = (
+        SiteContact.objects
+        .filter(site=site)
+        .select_related("contact")
+    )
+
+    # Unikalne kontakty
+    contacts_by_id = {}
+    for sc in site_contacts:
+        contact = sc.contact
+        if contact and contact.pk not in contacts_by_id:
+            contacts_by_id[contact.pk] = contact
+
+    # Uporządkuj po __str__ (czyli tak jak pokazujesz kontakty w innych miejscach)
+    contacts = sorted(contacts_by_id.values(), key=lambda c: str(c))
+
+    results = [
+        {
+            "value": contact.pk,
+            "text": str(contact),
+        }
+        for contact in contacts
+    ]
+
+    return JsonResponse({"results": results})
