@@ -99,6 +99,13 @@
                   </a>
                 </li>
 
+                <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name and 'entity_' in url_name %}active{% endif %}"
+                    href="{% url 'core:entity_list' %}">
+                    Dane FV
+                  </a>
+                </li>
+
               </ul>
             {% endwith %}
           </div>

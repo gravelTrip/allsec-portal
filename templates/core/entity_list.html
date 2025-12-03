@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Dane FV – ALLSEC Portal{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="h3 mb-0">Dane FV</h1>
+      <p class="text-muted small mb-0">
+        Jednostki rozliczeniowe używane do fakturowania (wspólnoty, firmy, osoby).
+      </p>
+    </div>
+
+    {% if can_create %}
+      <a href="{% url 'core:entity_create' %}" class="btn btn-primary btn-sm">
+        + Nowe dane FV
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr class="small text-muted">
+            <th>Nazwa</th>
+            <th>Typ</th>
+            <th>Miasto</th>
+            <th>NIP</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if entities %}
+            {% for entity in entities %}
+              <tr>
+                <td>{{ entity.name }}</td>
+                <td>{{ entity.get_type_display }}</td>
+                <td>
+                  <span class="small text-muted">
+                    {{ entity.city }}
+                  </span>
+                </td>
+                <td>{{ entity.nip }}</td>
+                <td class="text-end">
+                  <a href="{% url 'core:entity_detail' entity.pk %}"
+                     class="btn btn-sm btn-primary">
+                    Szczegóły
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted small py-3">
+                Brak zdefiniowanych danych fakturowych.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer bg-white border-0">
+        <nav aria-label="Paginacja danych FV">
+          <ul class="pagination pagination-sm mb-0 justify-content-end">
+            {% if page_obj.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">«</span>
+              </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+              <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+              </li>
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+              </li>
+            {% else %}
+              <li class="page-item disabled">
+                <span class="page-link">»</span>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

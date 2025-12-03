@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}
+  {% if entity %}Edytuj dane FV – ALLSEC Portal{% else %}Nowe dane FV – ALLSEC Portal{% endif %}
+{% endblock %}
+
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h4 mb-1">
+        {% if entity %}Edytuj dane FV{% else %}Nowe dane FV{% endif %}
+      </h1>
+      <p class="text-muted small mb-0">
+        Uzupełnij dane jednostki rozliczeniowej wykorzystywanej do fakturowania.
+      </p>
+    </div>
+
+    <a href="{% url 'core:entity_list' %}"
+       class="btn btn-sm btn-outline-secondary">
+      &larr; Lista danych FV
+    </a>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <form method="post" novalidate>
+        {% csrf_token %}
+
+        <div class="row">
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">{{ form.name.label }}</label>
+              {{ form.name }}
+              {% if form.name.errors %}
+                <div class="text-danger small">{{ form.name.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.type.label }}</label>
+              {{ form.type }}
+              {% if form.type.errors %}
+                <div class="text-danger small">{{ form.type.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.nip.label }}</label>
+              {{ form.nip }}
+              {% if form.nip.errors %}
+                <div class="text-danger small">{{ form.nip.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.regon.label }}</label>
+              {{ form.regon }}
+              {% if form.regon.errors %}
+                <div class="text-danger small">{{ form.regon.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.pesel.label }}</label>
+              {{ form.pesel }}
+              {% if form.pesel.errors %}
+                <div class="text-danger small">{{ form.pesel.errors|striptags }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="mb-2">
+              <label class="form-label small">{{ form.street.label }}</label>
+              {{ form.street }}
+              {% if form.street.errors %}
+                <div class="text-danger small">{{ form.street.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.postal_code.label }}</label>
+              {{ form.postal_code }}
+              {% if form.postal_code.errors %}
+                <div class="text-danger small">{{ form.postal_code.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.city.label }}</label>
+              {{ form.city }}
+              {% if form.city.errors %}
+                <div class="text-danger small">{{ form.city.errors|striptags }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-2">
+              <label class="form-label small">{{ form.notes.label }}</label>
+              {{ form.notes }}
+              {% if form.notes.errors %}
+                <div class="text-danger small">{{ form.notes.errors|striptags }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3 d-flex justify-content-end gap-2">
+          {% if entity %}
+            <button type="submit" class="btn btn-primary btn-sm">
+              Zapisz zmiany
+            </button>
+          {% else %}
+            <button type="submit" class="btn btn-primary btn-sm">
+              Zapisz
+            </button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

@@ -44,6 +44,14 @@ urlpatterns = [
     path("kontakty/<int:pk>/edytuj/", views.contact_edit, name="contact_edit"),
     path("kontakty/<int:pk>/usun/", views.contact_delete, name="contact_delete"),
 
+        # DANE FAKTUROWE (Entity)
+    path("dane-fv/", views.entity_list, name="entity_list"),
+    path("dane-fv/nowe/", views.entity_create, name="entity_create"),
+    path("dane-fv/<int:pk>/", views.entity_detail, name="entity_detail"),
+    path("dane-fv/<int:pk>/edytuj/", views.entity_edit, name="entity_edit"),
+    path("dane-fv/<int:pk>/usun/", views.entity_delete, name="entity_delete"),
+
+
     # Zarządcy
     path("zarzadcy/", views.manager_list, name="manager_list"),
     path("zarzadcy/nowy/", views.manager_create, name="manager_create"),

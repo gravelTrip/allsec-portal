@@ -9,6 +9,7 @@ from .models import (
     SiteContact,
     Manager,
     ServiceReportItem,
+    Entity,
 )
 
 
@@ -265,6 +266,50 @@ class SiteForm(forms.ModelForm):
                 attrs={"class": "form-control form-control-sm", "rows": 3}
             ),
             "technical_notes": forms.Textarea(
+                attrs={"class": "form-control form-control-sm", "rows": 3}
+            ),
+        }
+
+class EntityForm(forms.ModelForm):
+    class Meta:
+        model = Entity
+        fields = [
+            "name",
+            "type",
+            "nip",
+            "regon",
+            "pesel",
+            "street",
+            "postal_code",
+            "city",
+            "notes",
+        ]
+        widgets = {
+            "name": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "type": forms.Select(
+                attrs={"class": "form-select form-select-sm"}
+            ),
+            "nip": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "regon": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "pesel": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "street": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "postal_code": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "city": forms.TextInput(
+                attrs={"class": "form-control form-control-sm"}
+            ),
+            "notes": forms.Textarea(
                 attrs={"class": "form-control form-control-sm", "rows": 3}
             ),
         }

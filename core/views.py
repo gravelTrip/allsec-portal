@@ -18,7 +18,9 @@ from .models import (
     Manager,
     Contact,
     SiteContact,
+    Entity,
 )
+
 from .forms import (
     WorkOrderForm,
     ServiceReportForm,
@@ -28,6 +30,7 @@ from .forms import (
     SystemForm,
     SiteContactForm,
     ServiceReportItemFormSet,
+    EntityForm,
 )
 
 
@@ -853,3 +856,90 @@ def service_report_pdf(request, pk):
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+# =========================
+# DANE FAKTUROWE (Entity)
+# =========================
+
+@login_required
+def entity_list(request):
+    qs = Entity.objects.order_by("name")
+    paginator = Paginator(qs, 25)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "entities": page_obj.object_list,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "can_create": is_office(request.user),
+    }
+    return render(request, "core/entity_list.html", context)
+
+
+@login_required
+def entity_detail(request, pk):
+    entity = get_object_or_404(Entity, pk=pk)
+    sites = entity.sites.select_related("manager").order_by("name")
+
+    context = {
+        "entity": entity,
+        "sites": sites,
+    }
+    return render(request, "core/entity_detail.html", context)
+
+
+@login_required
+def entity_create(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do tworzenia danych FV.")
+
+    if request.method == "POST":
+        form = EntityForm(request.POST)
+        if form.is_valid():
+            entity = form.save()
+            return redirect("core:entity_detail", pk=entity.pk)
+    else:
+        form = EntityForm()
+
+    context = {
+        "form": form,
+        "entity": None,
+    }
+    return render(request, "core/entity_form.html", context)
+
+
+@login_required
+def entity_edit(request, pk):
+    entity = get_object_or_404(Entity, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do edycji danych FV.")
+
+    if request.method == "POST":
+        form = EntityForm(request.POST, instance=entity)
+        if form.is_valid():
+            entity = form.save()
+            return redirect("core:entity_detail", pk=entity.pk)
+    else:
+        form = EntityForm(instance=entity)
+
+    context = {
+        "form": form,
+        "entity": entity,
+    }
+    return render(request, "core/entity_form.html", context)
+
+
+@login_required
+def entity_delete(request, pk):
+    entity = get_object_or_404(Entity, pk=pk)
+
+    if not is_office(request.user):
+        return HttpResponseForbidden("Brak uprawnień do usuwania danych FV.")
+
+    if request.method == "POST":
+        entity.delete()
+        return redirect("core:entity_list")
+
+    return redirect("core:entity_detail", pk=pk)
