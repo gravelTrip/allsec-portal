@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 from django.db.models import Sum
 
+import base64
 from weasyprint import HTML
 from pathlib import Path
 from django.conf import settings
@@ -841,6 +842,15 @@ def service_report_detail(request, pk):
     }
     return render(request, "core/servicereport_detail.html", context)
 
+def get_logo_data_uri():
+    """Zwraca data URL z logo jako base64, albo None jeśli się nie uda."""
+    logo_path = Path(settings.BASE_DIR, "static", "img", "logo2-150.jpg")
+    try:
+        with open(logo_path, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode("ascii")
+        return f"data:image/jpeg;base64,{encoded}"
+    except OSError:
+        return None
 
 @login_required
 def service_report_pdf(request, pk):
@@ -851,16 +861,14 @@ def service_report_pdf(request, pk):
     items = report.items.all()
     items_total = items.aggregate(total=Sum("total_price"))["total"] or 0
 
-    # Bezwzględna ścieżka do pliku z logo (ta sama na DEV i PROD)
-    logo_file = settings.BASE_DIR / "static" / "img" / "logo2-150.jpg"
-    logo_path = logo_file.as_uri()  # np. file:///home/alsec/web_app/allsec_portal/static/img/logo2-150.jpg
+    logo_data_uri = get_logo_data_uri()
 
     html = render_to_string(
         "core/servicereport_pdf.html",
         {
             "report": report,
             "order": order,
-            "logo_path": logo_path,
+            "logo_path": logo_data_uri,
             "items": items,
             "items_total": items_total,
         },
