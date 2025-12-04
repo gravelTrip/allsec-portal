@@ -232,15 +232,15 @@ class System(models.Model):
     """System na obiekcie: CCTV, SSP, Alarm, Oddymianie, KD, Domofon, TV-SAT, Światłowód itp."""
 
     class SystemType(models.TextChoices):
-        CCTV = "CCTV", "CCTV"
-        SSP = "SSP", "System Sygnalizacji Pożaru"
-        ALARM = "ALARM", "System alarmowy"
-        ODDYM = "ODDYM", "Oddymianie"
-        KD = "KD", "Kontrola dostępu"
-        DOMOFON = "DOMOFON", "Domofon"
-        VIDEODOMOFON = "VIDEODOMOFON", "Wideodomofon"
-        TVSAT = "TVSAT", "TV naziemna / SAT"
-        SWIATLOWOD = "SWIATLOWOD", "Światłowód"
+        CCTV = "CCTV", "System CCTV"
+        SSP = "SSP", "System SSP"
+        ALARM = "ALARM", "System SSWiN"
+        ODDYM = "ODDYM", "System Oddymiania"
+        KD = "KD", "System Kontroli Dostępu"
+        DOMOFON = "DOMOFON", "Domofon"  # zostaje tylko dla starych wpisów
+        VIDEODOMOFON = "VIDEODOMOFON", "System Video/Domofonowy"
+        TVSAT = "TVSAT", "System RTV/SAT"
+        SWIATLOWOD = "SWIATLOWOD", "Sieci LAN/OPTO"
         INNY = "INNY", "Inny system"
 
     site = models.ForeignKey(

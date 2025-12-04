@@ -415,6 +415,40 @@ class SystemForm(BootstrapModelForm):
         # Pole 'site' ustawiamy z widoku (nie pokazujemy w formularzu)
         exclude = ["site"]
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        field = self.fields.get("system_type")
+        if not field:
+            return
+
+        st = System.SystemType
+
+        # Docelowa lista typów, które użytkownik ma widzieć
+        base_choices = [
+            (st.SSP, st.SSP.label),               # System SSP
+            (st.ODDYM, st.ODDYM.label),           # System Oddymiania
+            (st.CCTV, st.CCTV.label),             # System CCTV
+            (st.VIDEODOMOFON, st.VIDEODOMOFON.label),  # System Video/Domofonowy
+            (st.KD, st.KD.label),                 # System Kontroli Dostępu
+            (st.ALARM, st.ALARM.label),           # System SSWiN
+            (st.TVSAT, st.TVSAT.label),           # System RTV/SAT
+            (st.SWIATLOWOD, st.SWIATLOWOD.label), # Sieci LAN/OPTO
+            (st.INNY, st.INNY.label),             # Inny system
+        ]
+
+        # Jeżeli edytujemy stary system typu DOMOFON,
+        # to dodajemy tę opcję, żeby formularz się nie wywalał
+        if (
+            self.instance is not None
+            and getattr(self.instance, "pk", None)
+            and self.instance.system_type == st.DOMOFON
+        ):
+            base_choices = [(st.DOMOFON, st.DOMOFON.label)] + base_choices
+
+        field.choices = base_choices
+
+
 class SiteContactForm(BootstrapModelForm):
     class Meta:
         model = SiteContact
