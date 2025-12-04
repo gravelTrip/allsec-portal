@@ -8,6 +8,8 @@ from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
 from django.db.models import Sum
 
 from weasyprint import HTML
+from pathlib import Path
+from django.conf import settings
 
 from .models import (
     WorkOrder,
@@ -849,7 +851,9 @@ def service_report_pdf(request, pk):
     items = report.items.all()
     items_total = items.aggregate(total=Sum("total_price"))["total"] or 0
 
-    logo_path = request.build_absolute_uri('/static/img/logo2-150.jpg')
+    # Bezwzględna ścieżka do pliku z logo (ta sama na DEV i PROD)
+    logo_file = settings.BASE_DIR / "static" / "img" / "logo2-150.jpg"
+    logo_path = logo_file.as_uri()  # np. file:///home/alsec/web_app/allsec_portal/static/img/logo2-150.jpg
 
     html = render_to_string(
         "core/servicereport_pdf.html",
@@ -863,7 +867,13 @@ def service_report_pdf(request, pk):
         request=request,
     )
 
-    pdf_file = HTML(string=html, base_url=request.build_absolute_uri('/')).write_pdf()
+    pdf_file = HTML(
+        string=html,
+        # base_url też ustawiamy na katalog projektu, wtedy relative URL-e
+        # będą liczone względem tego katalogu
+        base_url=settings.BASE_DIR.as_uri(),
+    ).write_pdf()
+
     filename = (report.number or f"protokol_{report.pk}") + ".pdf"
     response = HttpResponse(pdf_file, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
