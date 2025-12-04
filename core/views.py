@@ -868,7 +868,7 @@ def service_report_pdf(request, pk):
         {
             "report": report,
             "order": order,
-            "logo_path": logo_data_uri,
+            "logo_data_uri": logo_data_uri,
             "items": items,
             "items_total": items_total,
         },
