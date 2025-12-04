@@ -731,7 +731,9 @@ def ajax_site_systems(request, site_id):
 
 @login_required
 def service_report_edit(request, pk):
-    report = get_object_or_404(ServiceReport.objects.select_related("work_order__site"), pk=pk)
+    report = get_object_or_404(
+        ServiceReport.objects.select_related("work_order__site"), pk=pk
+    )
     order = report.work_order
     site = order.site if order else None
 
@@ -740,18 +742,29 @@ def service_report_edit(request, pk):
         item_formset = ServiceReportItemFormSet(request.POST, instance=report)
 
         if form.is_valid() and item_formset.is_valid():
-            form.save()
+            # Czy kliknięto zielony przycisk "Zatwierdź i nadaj numer"
+            finalize = "finalize" in request.POST
+
+            # Chcemy mieć kontrolę nad statusem, więc commit=False
+            report_obj = form.save(commit=False)
+
+            if finalize:
+                report_obj.status = ServiceReport.Status.FINAL
+            # jeśli nie finalize – zostawiamy status taki, jak był (np. DRAFT)
+
+            # to wywoła logikę w modelu (data protokołu + automatyczny numer)
+            report_obj.save()
+
+            # upewniamy się, że formset zapisuje się do tego samego protokołu
+            item_formset.instance = report_obj
             item_formset.save()
-            return redirect("core:service_report_detail", pk=report.pk)
+
+            return redirect("core:service_report_detail", pk=report_obj.pk)
     else:
         form = ServiceReportForm(instance=report)
         item_formset = ServiceReportItemFormSet(instance=report)
 
-    # suma netto istniejących pozycji (po zapisaniu zmian)
-    items_total = (
-        report.items.aggregate(total=Sum("total_price"))["total"]
-        or 0
-    )
+    items_total = report.items.aggregate(total=Sum("total_price"))["total"] or 0
 
     context = {
         "report": report,
@@ -762,7 +775,6 @@ def service_report_edit(request, pk):
         "items_total": items_total,
     }
     return render(request, "core/servicereport_form.html", context)
-
 
 
 @login_required
