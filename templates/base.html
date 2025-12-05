@@ -76,14 +76,14 @@
                   {# jak będziesz miał listę protokołów, podmień href na odpowiedni URL #}
                   <a class="nav-link sidebar-link {% if url_name and 'service_report' in url_name %}active{% endif %}"
                     href="{% url 'core:service_report_list' %}">
-                    Protokoły serwisowe
+                    Serwisy
                   </a>
                 </li>
 
                  <li class="nav-item">
                   <a class="nav-link sidebar-link {% if url_name and 'maintenance_protocol' in url_name %}active{% endif %}"
                     href="{% url 'core:maintenance_protocol_list' %}">
-                    Protokoły przeglądów
+                    Konserwacje
                   </a>
                 </li>
 

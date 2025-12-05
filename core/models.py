@@ -570,9 +570,9 @@ class WorkOrder(models.Model):
     """Zlecenie: przegląd, serwis lub wyjazd w ramach robót."""
 
     class WorkOrderType(models.TextChoices):
-        MAINTENANCE = "MAINTENANCE", "Przegląd okresowy"
-        SERVICE = "SERVICE", "Serwis awaryjny"
-        JOB = "JOB", "Robota / montaż (wyjazd)"
+        MAINTENANCE = "MAINTENANCE", "Konserwacja"
+        SERVICE = "SERVICE", "Serwis"
+        JOB = "JOB", "Montaż"
         OTHER = "OTHER", "Inne"
 
     class Status(models.TextChoices):
@@ -633,7 +633,7 @@ class WorkOrder(models.Model):
     title = models.CharField(
         "Tytuł / krótki opis",
         max_length=255,
-        help_text="Np. 'Awaria domofonu kl. B', 'Przegląd SSP Q1/2025'.",
+        help_text="Np. 'Awaria domofonu kl. B', 'Konserwacja SSP Q1/2025'.",
     )
 
     description = models.TextField(
@@ -723,11 +723,11 @@ class WorkOrder(models.Model):
         period_str = period_date.strftime("%m-%Y")
 
         if not self.title:
-            self.title = f"Przegląd {period_str}"
+            self.title = f"Konserwacja {period_str}"
 
         if not self.description:
             self.description = (
-                f"Wykonanie przeglądu konserwacyjnego na obiekcie za {period_str}"
+                f"Wykonanie konserwacji okresowej na obiekcie za {period_str}"
             )
     
     def save(self, *args, **kwargs):
@@ -838,21 +838,20 @@ class MaintenanceProtocol(models.Model):
     
     def build_default_sections_from_site(self) -> int:
         """
-        Tworzy sekcje i domyślne punkty kontroli na podstawie systemów na obiekcie,
-        które są w umowie serwisowej.
+        Tworzy sekcje i domyślne punkty kontroli na podstawie systemów na obiekcie
+        (lub systemów zaznaczonych w zleceniu jako „objęte zleceniem”).
         Zwraca liczbę utworzonych sekcji.
         """
 
         # Upewniamy się, że mamy przypisany obiekt
         if not self.site and self.work_order and self.work_order.site:
             self.site = self.work_order.site
-            # zapis tylko pola 'site', żeby nie ruszać nic więcej
             self.save(update_fields=["site"])
 
         if not self.site:
             return 0
 
-        # Jeśli sekcje już istnieją, nic nie robimy – żeby nie dublować
+        # Jeśli sekcje już istnieją – nie dublujemy
         if self.sections.exists():
             return self.sections.count()
 
@@ -862,9 +861,22 @@ class MaintenanceProtocol(models.Model):
             System,
         )
 
-        systems = System.objects.filter(
-            site=self.site,
-            in_service_contract=True,
+        # 1) Priorytet: systemy zaznaczone w zleceniu
+        systems_qs = None
+        if self.work_order_id:
+            selected = self.work_order.systems.all()
+            if selected.exists():
+                systems_qs = selected
+
+        # 2) Jeśli w zleceniu NIC nie zaznaczono → bierzemy wszystkie „w umowie”
+        if systems_qs is None:
+            systems_qs = System.objects.filter(
+                site=self.site,
+                in_service_contract=True,
+            )
+
+        systems = systems_qs.select_related("site").order_by(
+            "system_type", "manufacturer", "model"
         )
 
         order_counter = 0
@@ -873,7 +885,7 @@ class MaintenanceProtocol(models.Model):
         for system in systems:
             category = system.get_maintenance_category()
             if not category:
-                # Np. Sieci LAN/OPTO albo Inny – na razie nie robimy z nich sekcji KS
+                # Np. Sieci LAN/OPTO albo Inny – na razie je pomijamy w KS
                 continue
 
             header = MAINTENANCE_SECTION_HEADERS.get(category)
@@ -892,20 +904,18 @@ class MaintenanceProtocol(models.Model):
                 order=order_counter,
             )
 
-            # Tworzymy punkty kontrolne wg naszej checklisty
             for idx, label in enumerate(checks, start=1):
                 MaintenanceCheckItem.objects.create(
                     section=section,
                     order=idx,
                     label=label,
-                    # result domyślnie NOT_DONE, note puste
                 )
 
             created_sections += 1
             order_counter += 1
 
         return created_sections
-    
+
     def assign_number_if_needed(self, force: bool = False) -> None:
         """
         Nadaje numer protokołu i kolejny numer w MIESIĄCU.
@@ -940,9 +950,11 @@ class MaintenanceProtocol(models.Model):
     
     def initialize_sections_from_previous_or_default(self) -> int:
         """
-        Jeśli protokół nie ma jeszcze sekcji:
-        - próbuje skopiować sekcje i punkty z ostatniego protokołu dla tego samego obiektu,
-        - jeśli takiego nie ma – tworzy sekcje wg domyślnej checklisty.
+        Dla KAŻDEGO systemu objętego tym protokołem:
+        - próbujemy skopiować ostatnią sekcję KS dla tego systemu na tym obiekcie
+          (łącznie z wynikami i uwagami),
+        - jeśli nie znajdziemy żadnej wcześniejszej sekcji – tworzymy sekcję
+          z domyślnej checklisty dla danej kategorii.
         Zwraca liczbę utworzonych sekcji.
         """
 
@@ -950,33 +962,72 @@ class MaintenanceProtocol(models.Model):
         if self.sections.exists():
             return self.sections.count()
 
-        # Szukamy poprzedniego protokołu dla tego samego obiektu
-        last_protocol = (
-            MaintenanceProtocol.objects.filter(site=self.site)
-            .exclude(pk=self.pk)
-            .order_by("-period_year", "-period_month", "-id")
-            .first()
+        # Upewniamy się, że mamy przypisany obiekt
+        if not self.site and self.work_order and self.work_order.site:
+            self.site = self.work_order.site
+            self.save(update_fields=["site"])
+
+        if not self.site:
+            return 0
+
+        # 1) Ustalamy listę systemów:
+        #    - najpierw te zaznaczone w zleceniu,
+        #    - jeśli brak -> wszystkie "w umowie" na obiekcie.
+        systems_qs = None
+        if self.work_order_id:
+            selected = self.work_order.systems.all()
+            if selected.exists():
+                systems_qs = selected
+
+        if systems_qs is None:
+            systems_qs = System.objects.filter(
+                site=self.site,
+                in_service_contract=True,
+            )
+
+        systems = systems_qs.select_related("site").order_by(
+            "system_type", "manufacturer", "model"
         )
 
-        if last_protocol is not None:
-            created_sections = 0
+        created_sections = 0
+        order_counter = 0
 
-            for section in last_protocol.sections.all().order_by("order", "id"):
+        for system in systems:
+            category = system.get_maintenance_category()
+            if not category:
+                # np. Sieci LAN/OPTO, Inny – na razie pomijamy
+                continue
+
+            # 2) Szukamy ostatniej sekcji dla TEGO systemu
+            last_section = (
+                MaintenanceSection.objects
+                .filter(system=system, protocol__site=self.site)
+                .select_related("protocol")
+                .order_by(
+                    "-protocol__period_year",
+                    "-protocol__period_month",
+                    "-protocol__id",
+                    "-id",
+                )
+                .first()
+            )
+
+            if last_section:
+                # 2a) Kopia sekcji + wszystkich punktów
                 new_section = MaintenanceSection.objects.create(
                     protocol=self,
-                    system=section.system,
-                    system_type=section.system_type,
-                    header_name=section.header_name,
-                    manufacturer=section.manufacturer,
-                    model=section.model,
-                    location=section.location,
-                    section_result=section.section_result,
-                    section_remarks=section.section_remarks,
-                    order=section.order,
+                    system=system,
+                    system_type=last_section.system_type,
+                    header_name=last_section.header_name,
+                    manufacturer=last_section.manufacturer,
+                    model=last_section.model,
+                    location=last_section.location,
+                    section_result=last_section.section_result,
+                    section_remarks=last_section.section_remarks,
+                    order=order_counter,
                 )
 
-                # kopiujemy wszystkie punkty kontrolne
-                for item in section.check_items.all().order_by("order", "id"):
+                for item in last_section.check_items.all().order_by("order", "id"):
                     MaintenanceCheckItem.objects.create(
                         section=new_section,
                         order=item.order,
@@ -986,12 +1037,36 @@ class MaintenanceProtocol(models.Model):
                         active=item.active,
                     )
 
-                created_sections += 1
+            else:
+                # 2b) Brak historii dla tego systemu – tworzymy z domyślnej checklisty
+                header = MAINTENANCE_SECTION_HEADERS.get(category)
+                checks = MAINTENANCE_DEFAULT_CHECKS.get(category, [])
+                if not header or not checks:
+                    continue
 
-            return created_sections
+                new_section = MaintenanceSection.objects.create(
+                    protocol=self,
+                    system=system,
+                    system_type=category,
+                    header_name=header,
+                    manufacturer=system.manufacturer or "",
+                    model=system.model or "",
+                    location=system.location_info or "",
+                    order=order_counter,
+                )
 
-        # Jeśli nie ma poprzedniego protokołu – budujemy od zera
-        return self.build_default_sections_from_site()
+                for idx, label in enumerate(checks, start=1):
+                    MaintenanceCheckItem.objects.create(
+                        section=new_section,
+                        order=idx,
+                        label=label,
+                    )
+
+            created_sections += 1
+            order_counter += 1
+
+        return created_sections
+
 
 
 
@@ -1156,7 +1231,7 @@ class ServiceReport(models.Model):
         on_delete=models.CASCADE,
         related_name="service_report",
         verbose_name="Zlecenie",
-        help_text="Zlecenie, którego dotyczy ten protokół (typu Serwis awaryjny).",
+        help_text="Zlecenie, którego dotyczy ten protokół (typu Serwis).",
     )
 
     number = models.CharField(
@@ -1263,7 +1338,7 @@ class ServiceReport(models.Model):
 
         if self.work_order and self.work_order.work_type != WorkOrder.WorkOrderType.SERVICE:
             raise ValidationError(
-                {"work_order": "Protokół serwisowy można podpiąć tylko do zlecenia typu 'Serwis awaryjny'."}
+                {"work_order": "Protokół serwisowy można podpiąć tylko do zlecenia typu 'Serwis'."}
             )
 
     def save(self, *args, **kwargs):

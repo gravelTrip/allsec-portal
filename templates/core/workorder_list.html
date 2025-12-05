@@ -7,7 +7,7 @@
     <div>
       <h1 class="h3 mb-0">Zlecenia</h1>
       <p class="text-muted small mb-0">
-        Lista wszystkich zleceń serwisowych, przeglądów i robót.
+        Lista wszystkich serwisów, konserwacji i montaży
       </p>
     </div>
 
@@ -106,9 +106,9 @@
                   {% if order.work_type == order.WorkOrderType.SERVICE %}
                     <span class="badge bg-danger">Serwis</span>
                   {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-                    <span class="badge bg-info text-dark">Przegląd</span>
+                    <span class="badge bg-info text-dark">Konserwacja</span>
                   {% elif order.work_type == order.WorkOrderType.JOB %}
-                    <span class="badge bg-secondary">Robota</span>
+                    <span class="badge bg-secondary">Montaż</span>
                   {% else %}
                     <span class="badge bg-light text-dark">Inne</span>
                   {% endif %}

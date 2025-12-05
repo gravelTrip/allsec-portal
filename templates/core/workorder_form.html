@@ -272,9 +272,19 @@
           }
 
           const label = document.createElement("label");
-          label.className = "form-check-label";
+          label.className = "form-check-label d-flex align-items-center gap-1";
           label.setAttribute("for", input.id);
-          label.textContent = sys.label;
+
+          const textSpan = document.createElement("span");
+          textSpan.textContent = sys.label;
+          label.appendChild(textSpan);
+
+          if (sys.in_contract) {
+            const badge = document.createElement("span");
+            badge.className = "badge bg-success ms-1";
+            badge.textContent = "w umowie";
+            label.appendChild(badge);
+          }
 
           wrapper.appendChild(input);
           wrapper.appendChild(label);

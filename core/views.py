@@ -796,13 +796,19 @@ def ajax_site_systems(request, site_id):
         if s.model:
             parts.append(str(s.model))
         label = " – ".join(parts)
-        if getattr(s, "in_contract", False):
-            label += " (w umowie)"
+
+        # flaga: czy system jest w umowie
+        in_contract_flag = getattr(
+            s,
+            "in_service_contract",
+            getattr(s, "in_contract", False),
+        )
 
         data.append(
             {
                 "id": s.id,
-                "label": label,
+                "label": label,                     # UWAGA: bez "(w umowie)"
+                "in_contract": bool(in_contract_flag),  # flaga do badga
             }
         )
 

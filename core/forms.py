@@ -184,11 +184,11 @@ class WorkOrderForm(forms.ModelForm):
             period_str = period_date.strftime("%m-%Y")
 
             if not title:
-                cleaned["title"] = f"Przegląd {period_str}"
+                cleaned["title"] = f"Konserwacja {period_str}"
 
             if not description:
                 cleaned["description"] = (
-                    f"Wykonanie przeglądu konserwacyjnego na obiekcie za {period_str}"
+                    f"Wykonanie konserwacji okresowej na obiekcie za {period_str}"
                 )
 
         else:
