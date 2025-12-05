@@ -14,6 +14,9 @@ from .models import (
     WorkOrder,
     ServiceReport,
     ServiceReportItem,
+    MaintenanceProtocol, 
+    MaintenanceSection, 
+    MaintenanceCheckItem
 )
 
 
@@ -334,3 +337,33 @@ class ServiceReportAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+@admin.register(MaintenanceProtocol)
+class MaintenanceProtocolAdmin(admin.ModelAdmin):
+    list_display = (
+        "number",
+        "site",
+        "work_order",
+        "date",
+        "period_month",
+        "period_year",
+        "next_period_month",
+        "next_period_year",
+        "status",
+    )
+    list_filter = ("status", "period_year", "period_month", "site")
+    search_fields = ("number", "site__name", "work_order__id")
+
+
+@admin.register(MaintenanceSection)
+class MaintenanceSectionAdmin(admin.ModelAdmin):
+    list_display = ("protocol", "header_name", "system", "location", "section_result", "order")
+    list_filter = ("header_name", "section_result")
+    search_fields = ("protocol__number", "system__name", "location")
+
+
+@admin.register(MaintenanceCheckItem)
+class MaintenanceCheckItemAdmin(admin.ModelAdmin):
+    list_display = ("section", "order", "label", "result", "active")
+    list_filter = ("result", "active")
+    search_fields = ("label", "section__protocol__number")

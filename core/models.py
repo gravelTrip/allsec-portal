@@ -2,6 +2,10 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from decimal import Decimal
+from django.db.models import Max
+
+from datetime import date
+from django.utils.translation import gettext_lazy as _
 
 
 
@@ -147,7 +151,100 @@ class Site(models.Model):
     def __str__(self):
         return f"{self.name} ({self.city})" if self.city else self.name
 
+    class MaintenanceFrequency(models.TextChoices):
+        NONE = "NONE", _("Brak stałych przeglądów")
+        MONTHLY = "MONTHLY", _("Co miesiąc")
+        QUARTERLY = "QUARTERLY", _("Co kwartał")
+        SEMIANNUAL = "SEMIANNUAL", _("2x w roku")
+        CUSTOM = "CUSTOM", _("Wg wybranych miesięcy")
 
+    maintenance_frequency = models.CharField(
+        max_length=15,
+        choices=MaintenanceFrequency.choices,
+        default=MaintenanceFrequency.NONE,
+        verbose_name="Częstotliwość przeglądów",
+        help_text="Określa schemat przeglądów okresowych na obiekcie.",
+    )
+
+    maintenance_start_month = models.PositiveSmallIntegerField(
+        choices=[(i, f"{i:02d}") for i in range(1, 13)],
+        null=True,
+        blank=True,
+        verbose_name="Miesiąc startowy przeglądów",
+        help_text="Używane dla schematów co miesiąc / kwartał / 2x w roku.",
+    )
+
+    # Prosty sposób na custom: lista miesięcy 1–12 jako tekst, np. '1,4,7,10'
+    maintenance_custom_months = models.CharField(
+        max_length=50,
+        null=True,
+        blank=True,
+        verbose_name="Miesiące przeglądów (CUSTOM)",
+        help_text="Lista miesięcy 1–12 rozdzielona przecinkami, np. '1,4,7,10'.",
+    )
+
+    @property
+    def maintenance_months(self):
+        """
+        Zwraca posortowaną listę miesięcy (1–12),
+        w których przypadają przeglądy dla tego obiektu.
+        """
+        freq = self.maintenance_frequency
+        if freq == self.MaintenanceFrequency.NONE:
+            return []
+
+        # CUSTOM – parsujemy maintenance_custom_months
+        if freq == self.MaintenanceFrequency.CUSTOM:
+            if not self.maintenance_custom_months:
+                return []
+            try:
+                nums = [
+                    int(x)
+                    for x in self.maintenance_custom_months.split(",")
+                    if x.strip()
+                ]
+                # filtrujemy miesiące poza zakresem
+                months = sorted({m for m in nums if 1 <= m <= 12})
+                return months
+            except ValueError:
+                return []
+
+        # Pozostałe schematy wymagają miesiąca startowego
+        start = self.maintenance_start_month
+        if not start:
+            return []
+
+        if freq == self.MaintenanceFrequency.MONTHLY:
+            return list(range(1, 13))
+
+        if freq == self.MaintenanceFrequency.QUARTERLY:
+            return sorted(((start + i * 3 - 1) % 12) + 1 for i in range(4))
+
+        if freq == self.MaintenanceFrequency.SEMIANNUAL:
+            return sorted(((start + i * 6 - 1) % 12) + 1 for i in range(2))
+
+        return []
+
+    def get_next_maintenance_period(self, from_year: int, from_month: int):
+        """
+        Zwraca (year, month) dla następnego planowego przeglądu
+        liczonego względem podanego okresu (rok, miesiąc).
+        Jeśli obiekt nie ma ustawionych miesięcy – zwraca (None, None).
+        """
+        months = self.maintenance_months
+        if not months:
+            return None, None
+
+        current_year = from_year
+        current_month = from_month
+
+        # Szukamy najbliższego miesiąca z listy > current_month
+        future_months = [m for m in months if m > current_month]
+        if future_months:
+            return current_year, min(future_months)
+
+        # Jeśli brak większego w tym roku – bierzemy pierwszy miesiąc z listy w kolejnym roku
+        return current_year + 1, min(months)
 
 class Contact(models.Model):
     """Osoba kontaktowa: zarządca, administrator, właściciel, dozorca itp."""
@@ -312,6 +409,35 @@ class System(models.Model):
         if self.name:
             base = f"{self.name} ({base})"
         return f"{base} – {self.site}"
+    
+    def get_maintenance_category(self) -> str | None:
+        """
+        Zwraca nazwę kategorii konserwacyjnej:
+        'SSP', 'ODDYM', 'CCTV', 'VIDEODOMOFON', 'KD', 'SSWIN', 'RTV_SAT'
+        albo None, jeśli system nie ma dedykowanej sekcji w protokole KS.
+        """
+        st = self.SystemType
+        t = self.system_type
+
+        if t == st.SSP:
+            return "SSP"
+        if t == st.ODDYM:
+            return "ODDYM"
+        if t == st.CCTV:
+            return "CCTV"
+        if t in (st.VIDEODOMOFON, st.DOMOFON):
+            # klasyczny domofon też wrzucimy do sekcji Video/Domofon
+            return "VIDEODOMOFON"
+        if t == st.KD:
+            return "KD"
+        if t == st.ALARM:
+            return "SSWIN"
+        if t == st.TVSAT:
+            return "RTV_SAT"
+
+        # Sieci LAN/OPTO i Inne systemy na razie nie mają osobnych sekcji KS
+        # (można będzie dodać później, jeśli będzie potrzeba)
+        return None
 
 class Job(models.Model):
     """Robota / projekt: montaż, modernizacja, rozbudowa."""
@@ -582,7 +708,32 @@ class WorkOrder(models.Model):
     def __str__(self):
         return f"#{self.id} {self.title}"
     
+    def _set_maintenance_title_and_description(self):
+        """
+        Ustawia domyślny tytuł i opis dla zleceń typu MAINTENANCE,
+        jeśli nie zostały podane ręcznie.
+        """
+        from .models import WorkOrder  # lokalny import, żeby uniknąć pętli
+
+        if self.work_type != WorkOrder.WorkOrderType.MAINTENANCE:
+            return
+
+        # Okres bierzemy z planned_date, a jeśli brak – z dzisiejszej daty
+        period_date = self.planned_date or date.today()
+        period_str = period_date.strftime("%m-%Y")
+
+        if not self.title:
+            self.title = f"Przegląd {period_str}"
+
+        if not self.description:
+            self.description = (
+                f"Wykonanie przeglądu konserwacyjnego na obiekcie za {period_str}"
+            )
+    
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if is_new:
+            self._set_maintenance_title_and_description()
         # jeśli numer nie ustawiony – wygeneruj
         if not self.number:
             today = timezone.localdate()
@@ -600,7 +751,382 @@ class WorkOrder(models.Model):
             self.number = f"ZL {count:02d}-{date_suffix}"
 
         super().save(*args, **kwargs)
+
+class MaintenanceProtocol(models.Model):
+    """Protokół konserwacji (przegląd okresowy) powiązany ze zleceniem MAINTENANCE."""
+
+    class Status(models.TextChoices):
+        OPEN = "OPEN", "W edycji"
+        CLOSED = "CLOSED", "Zamknięty"
+
+    work_order = models.OneToOneField(
+        "WorkOrder",
+        on_delete=models.CASCADE,
+        related_name="maintenance_protocol",
+        verbose_name="Zlecenie przeglądu",
+    )
+
+    site = models.ForeignKey(
+        Site,
+        on_delete=models.CASCADE,
+        related_name="maintenance_protocols",
+        verbose_name="Obiekt",
+    )
+
+    number = models.CharField(
+        "Numer protokołu",
+        max_length=50,
+        null=True,
+        blank=True,
+        help_text="Numer w formacie KS {kolejny}/{MM}/{RRRR}.",
+    )
+
+    sequence_number = models.PositiveIntegerField(
+        "Kolejny numer w roku",
+        blank=True,
+        null=True,
+        help_text="Numer porządkowy KS w danym roku.",
+    )
+
+    period_month = models.PositiveSmallIntegerField(
+        "Miesiąc okresu przeglądu",
+        blank=True,
+        null=True,
+    )
+
+    period_year = models.PositiveSmallIntegerField(
+        "Rok okresu przeglądu",
+        blank=True,
+        null=True,
+    )
+
+    date = models.DateField(
+        "Data wykonania przeglądu",
+        blank=True,
+        null=True,
+    )
+
+    next_period_month = models.PositiveSmallIntegerField(
+        "Miesiąc następnego przeglądu",
+        blank=True,
+        null=True,
+    )
+
+    next_period_year = models.PositiveSmallIntegerField(
+        "Rok następnego przeglądu",
+        blank=True,
+        null=True,
+    )
+
+    status = models.CharField(
+        "Status",
+        max_length=16,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+
+    created_at = models.DateTimeField("Utworzono", auto_now_add=True)
+    updated_at = models.DateTimeField("Zaktualizowano", auto_now=True)
+
+    class Meta:
+        verbose_name = "Protokół konserwacji"
+        verbose_name_plural = "Protokoły konserwacji"
+        ordering = ["-date", "-id"]
+
+    def __str__(self):
+        return self.number or f"KS (ID {self.pk})"
     
+    def build_default_sections_from_site(self) -> int:
+        """
+        Tworzy sekcje i domyślne punkty kontroli na podstawie systemów na obiekcie,
+        które są w umowie serwisowej.
+        Zwraca liczbę utworzonych sekcji.
+        """
+
+        # Upewniamy się, że mamy przypisany obiekt
+        if not self.site and self.work_order and self.work_order.site:
+            self.site = self.work_order.site
+            # zapis tylko pola 'site', żeby nie ruszać nic więcej
+            self.save(update_fields=["site"])
+
+        if not self.site:
+            return 0
+
+        # Jeśli sekcje już istnieją, nic nie robimy – żeby nie dublować
+        if self.sections.exists():
+            return self.sections.count()
+
+        from .models import (
+            MAINTENANCE_SECTION_HEADERS,
+            MAINTENANCE_DEFAULT_CHECKS,
+            System,
+        )
+
+        systems = System.objects.filter(
+            site=self.site,
+            in_service_contract=True,
+        )
+
+        order_counter = 0
+        created_sections = 0
+
+        for system in systems:
+            category = system.get_maintenance_category()
+            if not category:
+                # Np. Sieci LAN/OPTO albo Inny – na razie nie robimy z nich sekcji KS
+                continue
+
+            header = MAINTENANCE_SECTION_HEADERS.get(category)
+            checks = MAINTENANCE_DEFAULT_CHECKS.get(category, [])
+            if not header or not checks:
+                continue
+
+            section = MaintenanceSection.objects.create(
+                protocol=self,
+                system=system,
+                system_type=category,
+                header_name=header,
+                manufacturer=system.manufacturer or "",
+                model=system.model or "",
+                location=system.location_info or "",
+                order=order_counter,
+            )
+
+            # Tworzymy punkty kontrolne wg naszej checklisty
+            for idx, label in enumerate(checks, start=1):
+                MaintenanceCheckItem.objects.create(
+                    section=section,
+                    order=idx,
+                    label=label,
+                    # result domyślnie NOT_DONE, note puste
+                )
+
+            created_sections += 1
+            order_counter += 1
+
+        return created_sections
+    
+    def assign_number_if_needed(self, force: bool = False) -> None:
+        """
+        Nadaje numer protokołu i kolejny numer w MIESIĄCU.
+        Format (wg Twojej zmiany): KS {kolejny}-{MM}-{RRRR}
+        """
+        # Jeśli numer już jest i nie wymuszamy nadania – nic nie rób
+        if self.number and not force:
+            return
+
+        # Bez okresu nie nadamy sensownego numeru
+        if not self.period_year or not self.period_month:
+            return
+
+        # Szukamy maksymalnego sequence_number dla danego ROKU i MIESIĄCA
+        qs = MaintenanceProtocol.objects.filter(
+            period_year=self.period_year,
+            period_month=self.period_month,
+        ).exclude(pk=self.pk)
+
+        agg = qs.aggregate(max_seq=Max("sequence_number"))
+        last_seq = agg["max_seq"] or 0
+
+        next_seq = last_seq + 1
+
+        self.sequence_number = next_seq
+        # TU możesz zostawić dokładnie swój format;
+        # przykładowo:
+        self.number = f"KS {next_seq}-{self.period_month:02d}-{self.period_year}"
+
+        self.save(update_fields=["sequence_number", "number"])
+
+    
+    def initialize_sections_from_previous_or_default(self) -> int:
+        """
+        Jeśli protokół nie ma jeszcze sekcji:
+        - próbuje skopiować sekcje i punkty z ostatniego protokołu dla tego samego obiektu,
+        - jeśli takiego nie ma – tworzy sekcje wg domyślnej checklisty.
+        Zwraca liczbę utworzonych sekcji.
+        """
+
+        # Jeśli sekcje już istnieją – nic nie rób
+        if self.sections.exists():
+            return self.sections.count()
+
+        # Szukamy poprzedniego protokołu dla tego samego obiektu
+        last_protocol = (
+            MaintenanceProtocol.objects.filter(site=self.site)
+            .exclude(pk=self.pk)
+            .order_by("-period_year", "-period_month", "-id")
+            .first()
+        )
+
+        if last_protocol is not None:
+            created_sections = 0
+
+            for section in last_protocol.sections.all().order_by("order", "id"):
+                new_section = MaintenanceSection.objects.create(
+                    protocol=self,
+                    system=section.system,
+                    system_type=section.system_type,
+                    header_name=section.header_name,
+                    manufacturer=section.manufacturer,
+                    model=section.model,
+                    location=section.location,
+                    section_result=section.section_result,
+                    section_remarks=section.section_remarks,
+                    order=section.order,
+                )
+
+                # kopiujemy wszystkie punkty kontrolne
+                for item in section.check_items.all().order_by("order", "id"):
+                    MaintenanceCheckItem.objects.create(
+                        section=new_section,
+                        order=item.order,
+                        label=item.label,
+                        result=item.result,
+                        note=item.note,
+                        active=item.active,
+                    )
+
+                created_sections += 1
+
+            return created_sections
+
+        # Jeśli nie ma poprzedniego protokołu – budujemy od zera
+        return self.build_default_sections_from_site()
+
+
+
+class MaintenanceSection(models.Model):
+    """Sekcja protokołu konserwacji dla konkretnego systemu na obiekcie."""
+
+    class CheckResult(models.TextChoices):
+        OK = "OK", "✓ poprawny"
+        FAIL = "FAIL", "X niepoprawny"
+        NOT_DONE = "NOT_DONE", "O niewykonany"
+
+    protocol = models.ForeignKey(
+        MaintenanceProtocol,
+        on_delete=models.CASCADE,
+        related_name="sections",
+        verbose_name="Protokół konserwacji",
+    )
+
+    system = models.ForeignKey(
+        System,
+        on_delete=models.SET_NULL,
+        related_name="maintenance_sections",
+        verbose_name="System na obiekcie",
+        blank=True,
+        null=True,
+    )
+
+    system_type = models.CharField(
+        "Typ systemu",
+        max_length=32,
+        blank=True,
+        help_text="Cache typu systemu (SSP, CCTV, SSWIN itp.) dla raportów.",
+    )
+
+    header_name = models.CharField(
+        "Nazwa sekcji",
+        max_length=100,
+        help_text='Np. "System SSP", "System CCTV".',
+    )
+
+    manufacturer = models.CharField(
+        "Producent",
+        max_length=100,
+        blank=True,
+    )
+
+    model = models.CharField(
+        "Model",
+        max_length=100,
+        blank=True,
+    )
+
+    location = models.CharField(
+        "Lokalizacja",
+        max_length=255,
+        blank=True,
+        help_text="Np. portiernia, rozdzielnia, szafa RACK itp.",
+    )
+
+    section_result = models.CharField(
+        "Wynik sekcji",
+        max_length=16,
+        choices=CheckResult.choices,
+        blank=True,
+        null=True,
+    )
+
+    section_remarks = models.TextField(
+        "Uwagi (podsumowanie sekcji)",
+        blank=True,
+        help_text="Podsumowanie przeglądu dla całego systemu w tej sekcji.",
+    )
+
+    order = models.PositiveIntegerField(
+        "Kolejność sekcji",
+        default=0,
+    )
+
+    class Meta:
+        verbose_name = "Sekcja protokołu konserwacji"
+        verbose_name_plural = "Sekcje protokołu konserwacji"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.header_name} – {self.location or 'bez lokalizacji'}"
+
+
+class MaintenanceCheckItem(models.Model):
+    """Pojedynczy punkt kontrolny w sekcji protokołu konserwacji."""
+
+    section = models.ForeignKey(
+        MaintenanceSection,
+        on_delete=models.CASCADE,
+        related_name="check_items",
+        verbose_name="Sekcja protokołu",
+    )
+
+    order = models.PositiveIntegerField(
+        "Kolejność w sekcji",
+        default=0,
+    )
+
+    label = models.CharField(
+        "Opis czynności",
+        max_length=255,
+        help_text="Np. 'Sprawdzenie zasilania centrali'.",
+    )
+
+    result = models.CharField(
+        "Wynik",
+        max_length=16,
+        choices=MaintenanceSection.CheckResult.choices,
+        default=MaintenanceSection.CheckResult.NOT_DONE,
+    )
+
+    note = models.TextField(
+        "Tekst własny",
+        blank=True,
+        help_text="Dopisek pod punktem, np. 'data montażu: 2025/02'.",
+    )
+
+    active = models.BooleanField(
+        "Aktywny",
+        default=True,
+        help_text="Czy ten punkt jest używany dla danego obiektu.",
+    )
+
+    class Meta:
+        verbose_name = "Punkt kontrolny przeglądu"
+        verbose_name_plural = "Punkty kontrolne przeglądu"
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return self.label
+   
 
 class ServiceReport(models.Model):
     """Protokół serwisowy do zlecenia typu SERWIS."""
@@ -871,3 +1397,80 @@ class ServiceReportItem(models.Model):
         super().save(*args, **kwargs)
 
 
+# ==========================
+#  USTAWIENIA KONSERWACJI KS
+# ==========================
+
+# Klucze kategorii – będą później mapowane z System.SystemType:
+#  - "SSP"
+#  - "ODDYM"
+#  - "CCTV"
+#  - "VIDEODOMOFON"
+#  - "KD"
+#  - "SSWIN"
+#  - "RTV_SAT"
+
+MAINTENANCE_SECTION_HEADERS = {
+    "SSP": "System SSP",
+    "ODDYM": "System Oddymiania",
+    "CCTV": "System CCTV",
+    "VIDEODOMOFON": "System Video/Domofonowy",
+    "KD": "System Kontroli Dostępu",
+    "SSWIN": "System SSWiN",
+    "RTV_SAT": "System RTV/SAT",
+}
+
+MAINTENANCE_DEFAULT_CHECKS = {
+    "SSP": [
+        "Sprawdzenie zasilania centrali",
+        "Sprawdzenie akumulatora centrali",
+        "Sprawdzenie poprawności pracy centrali",
+        "Sprawdzenie elementów pętli",
+        "Sprawdzenie zadziałania sterowań pętli",
+        "Sprawdzenie linii sygnalizacyjnych",
+        "Sprawdzenie zasilaczy p-poż",
+    ],
+    "ODDYM": [
+        "Sprawdzenie zasilania centrali",
+        "Sprawdzenie akumulatora centrali",
+        "Sprawdzenie poprawności pracy centrali",
+        "Sprawdzenie elementów liniowych",
+        "Sprawdzenie oddymiania",
+        "Sprawdzenie napowietrzania",
+    ],
+    "CCTV": [
+        "Sprawdzenie działania systemu",
+        "Sprawdzenie elementów systemu",
+        "Sprawdzenie długości zapisu",
+        "Sprawdzenie odczytu materiału",
+        "Wyczyszczono kamery nr",
+        "Regulacja kamery nr (jeśli wymagana)",
+        "Sprawdzenie łączności sieciowej",
+    ],
+    "VIDEODOMOFON": [
+        "Sprawdzenie zasilania systemu",
+        "Sprawdzenie poprawności pracy systemu",
+        "Sprawdzenie łączności z losowymi lokalami",
+        "Sprawdzenie poprawności działania sterowań",
+    ],
+    "KD": [
+        "Sprawdzenie zasilania systemu",
+        "Sprawdzenie poprawności pracy systemu",
+        "Sprawdzenie poprawności działania sterowań",
+    ],
+    "SSWIN": [
+        "Sprawdzenie zasilania centrali",
+        "Sprawdzenie akumulatora centrali",
+        "Sprawdzenie poprawności pracy centrali",
+        "Sprawdzenie elementów systemu",
+        "Sprawdzenie pamięci zdarzeń za okres",
+        "Sprawdzenie modułów i zasilaczy",
+    ],
+    "RTV_SAT": [
+        "Sprawdzenie zasilania systemu",
+        "Sprawdzenie poprawności pracy systemu",
+        "Sprawdzenie sygnału z anten DVB-T / FM",
+        "Sprawdzenie sygnału anten DVB-S",
+        "Regulacja anten (jeśli wymagana)",
+    ],
+}

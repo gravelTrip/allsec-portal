@@ -3,6 +3,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8" />
+  <title>{{ download_filename }}</title>
   <style>
    @page {
     size: A4;
@@ -122,18 +123,25 @@
       width: 60mm;
       margin: 0 auto 1mm auto;
     }
+
+    @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
   </style>
 </head>
 <body>
+<div class="no-print" style="margin: 10px 0;">
+  <button type="button" onclick="window.print()">Drukuj / Zapisz jako PDF</button>
+</div>
 <div class="wrapper">
 
   {# ===== NAGŁÓWEK ===== #}
   <table class="no-border header-table">
     <tr>
       <td class="header-left">
-        {% if logo_data_uri %}
-          <img src="{{ logo_data_uri }}" alt="ALLSEC" class="header-logo" />
-        {% endif %}
+        <img src="{% static 'img/logo2-150.jpg' %}" alt="ALLSEC" class="header-logo" />
 
         <h1>
           Protokół serwisowy

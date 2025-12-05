@@ -119,6 +119,18 @@ urlpatterns = [
         views.site_contacts_json,
         name="site_contacts_json",
     ),
+
+    path(
+        "protokoły-konserwacji/<int:pk>/",
+        views.maintenance_protocol_detail,
+        name="maintenance_protocol_detail",
+    ),
+
+    path(
+        "protokoly-przegladow/",
+        views.maintenance_protocol_list,
+        name="maintenance_protocol_list",
+    ),
 ]
 
 

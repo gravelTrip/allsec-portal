@@ -233,6 +233,28 @@
           </div>
         </div>
       {% endif %}
+      {% if maintenance_protocol %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h5 class="card-title">Protokół konserwacji</h5>
+
+          <p class="mb-1">
+            Okres: {{ maintenance_protocol.period_month|default:"--" }}/{{ maintenance_protocol.period_year|default:"----" }}
+          </p>
+          {% if maintenance_protocol.next_period_month %}
+            <p class="mb-1">
+              Następny przegląd:
+              {{ maintenance_protocol.next_period_month }}/{{ maintenance_protocol.next_period_year }}
+            </p>
+          {% endif %}
+
+          <a href="{% url 'core:maintenance_protocol_detail' maintenance_protocol.pk %}"
+            class="btn btn-sm btn-outline-primary">
+            Podgląd protokołu konserwacji
+          </a>
+        </div>
+      </div>
+    {% endif %}
     </div>
   </div>
 {% endblock %}

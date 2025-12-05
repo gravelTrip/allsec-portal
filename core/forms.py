@@ -1,5 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
+from datetime import date
+from django.core.exceptions import ValidationError
 from .models import (
     WorkOrder,
     System,
@@ -100,6 +102,13 @@ class WorkOrderForm(forms.ModelForm):
         if requested_field is not None:
             requested_field.empty_label = ""
 
+        # 3) Tytuł i opis – nie wymagamy na poziomie formularza,
+        #    walidację robimy w clean() zależnie od typu zlecenia
+        if "title" in self.fields:
+            self.fields["title"].required = False
+        if "description" in self.fields:
+            self.fields["description"].required = False
+
     def clean_systems(self):
         systems = self.cleaned_data.get("systems")
         site = self.cleaned_data.get("site")
@@ -162,6 +171,32 @@ class WorkOrderForm(forms.ModelForm):
             # dla 'W ciągu dnia' czyścimy godziny, żeby nie wisiały stare wartości
             cleaned["planned_time_from"] = None
             cleaned["planned_time_to"] = None
+
+        # --- 3. Tytuł i opis zależnie od rodzaju zlecenia ---
+
+        work_type = cleaned.get("work_type")
+        title = cleaned.get("title")
+        description = cleaned.get("description")
+
+        # Zlecenie przeglądu okresowego – MAINTENANCE
+        if work_type == WorkOrder.WorkOrderType.MAINTENANCE:
+            period_date = planned_date or date.today()
+            period_str = period_date.strftime("%m-%Y")
+
+            if not title:
+                cleaned["title"] = f"Przegląd {period_str}"
+
+            if not description:
+                cleaned["description"] = (
+                    f"Wykonanie przeglądu konserwacyjnego na obiekcie za {period_str}"
+                )
+
+        else:
+            # Dla innych typów zleceń wymagamy tytułu i opisu
+            if not title:
+                self.add_error("title", "To pole jest wymagane.")
+            if not description:
+                self.add_error("description", "To pole jest wymagane.")
 
         return cleaned
     

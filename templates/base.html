@@ -80,6 +80,13 @@
                   </a>
                 </li>
 
+                 <li class="nav-item">
+                  <a class="nav-link sidebar-link {% if url_name and 'maintenance_protocol' in url_name %}active{% endif %}"
+                    href="{% url 'core:maintenance_protocol_list' %}">
+                    Protokoły przeglądów
+                  </a>
+                </li>
+
                 <li class="nav-item">
                   {# zakładam, że widoki obiektów/systemów mają w nazwie site_ albo system_ #}
                   <a class="nav-link sidebar-link {% if url_name and 'site_' in url_name or url_name and 'system_' in url_name %}active{% endif %}"

@@ -48,11 +48,13 @@
         </a>
       {% endif %}
 
-      <a href="{% url 'core:service_report_pdf' report.pk %}"
-         target="_blank"
-         class="btn btn-sm btn-outline-secondary">
+      <button type="button"
+              class="btn btn-sm btn-warning"
+              data-pdf-url="{% url 'core:service_report_pdf' report.pk %}"
+              data-pdf-title="{% if report.number %}{{ report.number }}{% else %}Protokol_{{ report.id }}{% endif %}"
+              onclick="openServiceReportPrint(this.dataset.pdfUrl, this.dataset.pdfTitle)">
         PDF
-      </a>
+      </button>
 
       {% if can_edit %}
         <a href="{% url 'core:service_report_edit' report.pk %}"
@@ -262,4 +264,58 @@
       {% endif %}
     </div>
   </div>
+  <script>
+  function openServiceReportPrint(url, filename) {
+    var originalTitle = document.title;
+
+    // utwórz ukryty iframe
+    var iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    iframe.src = url;  // np. /protokoly/123/pdf/
+
+    iframe.onload = function () {
+      try {
+        // Ustaw tytuł w ramce (jeśli się da) i w oknie głównym
+        if (filename) {
+          try {
+            iframe.contentDocument.title = filename;
+          } catch (e) {
+            // jakby były ograniczenia, to przynajmniej tytuł główny
+          }
+          document.title = filename;
+        }
+
+        // skup się na ramce i wywołaj drukowanie
+        iframe.contentWindow.focus();
+        iframe.contentWindow.print();
+
+        // po drukowaniu spróbuj posprzątać i przywrócić tytuł
+        iframe.contentWindow.onafterprint = function () {
+          if (iframe && iframe.parentNode) {
+            iframe.parentNode.removeChild(iframe);
+          }
+          if (filename) {
+            document.title = originalTitle;
+          }
+        };
+      } catch (e) {
+        if (iframe && iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+        console.error('Błąd podczas drukowania protokołu:', e);
+        if (filename) {
+          document.title = originalTitle;
+        }
+      }
+    };
+
+    document.body.appendChild(iframe);
+  }
+</script>
+
 {% endblock %}

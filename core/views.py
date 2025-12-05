@@ -1,15 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.template.loader import render_to_string
-from django.contrib.auth.models import Group
 from django.core.paginator import Paginator
 from django.utils import timezone
-from django.http import HttpResponseForbidden, JsonResponse, HttpResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.db.models import Sum
 
-import base64
-from weasyprint import HTML
-from pathlib import Path
+from django.views.decorators.clickjacking import xframe_options_sameorigin
+
+
 from django.conf import settings
 
 from .models import (
@@ -22,6 +20,7 @@ from .models import (
     Contact,
     SiteContact,
     Entity,
+    MaintenanceProtocol,
 )
 
 from .forms import (
@@ -192,6 +191,42 @@ def service_report_list(request):
     }
     return render(request, "core/servicereport_list.html", context)
 
+@login_required
+def maintenance_protocol_list(request):
+    qs = (
+        MaintenanceProtocol.objects
+        .select_related("site", "work_order")
+        .order_by("-period_year", "-period_month", "-id")
+    )
+
+    status = request.GET.get("status", "")
+    only_final = request.GET.get("only_final") == "on"
+
+    if status:
+        qs = qs.filter(status=status)
+    if only_final:
+        try:
+            qs = qs.filter(status=MaintenanceProtocol.Status.FINAL)
+        except AttributeError:
+            # jeśli kiedyś zrezygnujesz z pól statusowych, to po prostu nic nie filtrujemy
+            pass
+
+    paginator = Paginator(qs, 20)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        "page_obj": page_obj,
+        "filter_status": status,
+        "only_final": only_final,
+        # jeśli masz Status w MaintenanceProtocol – to zadziała; jak nie, możesz to usunąć
+        "status_choices": getattr(MaintenanceProtocol, "Status", None).choices
+        if hasattr(MaintenanceProtocol, "Status")
+        else [],
+    }
+    return render(request, "core/maintenance_protocol_list.html", context)
+
+
 
 @login_required
 def workorder_detail(request, pk):
@@ -199,6 +234,8 @@ def workorder_detail(request, pk):
         WorkOrder.objects.select_related("site", "assigned_to", "job").prefetch_related("systems"),
         pk=pk,
     )
+
+    protocol = getattr(order, "maintenance_protocol", None)
 
     # spróbujemy wyciągnąć powiązany protokół serwisowy (jeśli istnieje)
     service_report = getattr(order, "service_report", None)
@@ -209,6 +246,7 @@ def workorder_detail(request, pk):
         "order": order,
         "service_report": service_report,
         "can_edit": can_edit,
+        "maintenance_protocol": protocol,
     }
     return render(request, "core/workorder_detail.html", context)
 
@@ -223,6 +261,44 @@ def workorder_create(request):
         form = WorkOrderForm(request.POST)
         if form.is_valid():
             order = form.save()
+
+            # jeśli to zlecenie przeglądu okresowego – tworzymy protokół KS
+            if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
+                # zabezpieczenie: nie twórz dwa razy
+                if not hasattr(order, "maintenance_protocol"):
+                    # Ustalamy okres przeglądu na podstawie planned_date
+                    if order.planned_date:
+                        period_date = order.planned_date
+                    else:
+                        period_date = timezone.now().date()
+
+                    period_year = period_date.year
+                    period_month = period_date.month
+
+                    next_year = None
+                    next_month = None
+                    if order.site:
+                        next_year, next_month = order.site.get_next_maintenance_period(
+                            from_year=period_year,
+                            from_month=period_month,
+                        )
+
+                    protocol = MaintenanceProtocol.objects.create(
+                        work_order=order,
+                        site=order.site,
+                        period_year=period_year,
+                        period_month=period_month,
+                        next_period_year=next_year,
+                        next_period_month=next_month,
+                    )
+                    # Nadaj numer KS, jeśli jeszcze nie ma
+                    protocol.assign_number_if_needed()
+
+                    # Wygeneruj sekcje i punkty:
+                    # - jeśli jest poprzedni protokół dla obiektu → kopiuj z niego
+                    # - jeśli nie ma → domyślna checklista z systemów
+                    protocol.initialize_sections_from_previous_or_default()
+
             return redirect("core:workorder_detail", pk=order.pk)
     else:
         form = WorkOrderForm()
@@ -842,51 +918,33 @@ def service_report_detail(request, pk):
     }
     return render(request, "core/servicereport_detail.html", context)
 
-def get_logo_data_uri():
-    """Zwraca data URL z logo jako base64, albo None jeśli się nie uda."""
-    logo_path = Path(settings.BASE_DIR, "static", "img", "logo2-150.jpg")
-    try:
-        with open(logo_path, "rb") as f:
-            encoded = base64.b64encode(f.read()).decode("ascii")
-        return f"data:image/jpeg;base64,{encoded}"
-    except OSError:
-        return None
-
+@xframe_options_sameorigin
 @login_required
 def service_report_pdf(request, pk):
     report = get_object_or_404(ServiceReport, pk=pk)
     order = report.work_order
 
-     # wszystkie pozycje + suma netto
     items = report.items.all()
     items_total = items.aggregate(total=Sum("total_price"))["total"] or 0
 
-    logo_data_uri = get_logo_data_uri()
+    # baza nazwy pliku: numer protokołu albo fallback
+    base_name = report.number or f"protokol_{report.pk}"
 
-    html = render_to_string(
-        "core/servicereport_pdf.html",
-        {
-            "report": report,
-            "order": order,
-            "logo_data_uri": logo_data_uri,
-            "items": items,
-            "items_total": items_total,
-        },
-        request=request,
+    # proste "oczyszczenie" – usuwamy spacje i ukośniki itp.
+    safe_name = (
+        base_name
+        .replace("/", "_")
+        .replace("\\", "_")
     )
 
-    pdf_file = HTML(
-        string=html,
-        # base_url też ustawiamy na katalog projektu, wtedy relative URL-e
-        # będą liczone względem tego katalogu
-        base_url=settings.BASE_DIR.as_uri(),
-    ).write_pdf()
-
-    filename = (report.number or f"protokol_{report.pk}") + ".pdf"
-    response = HttpResponse(pdf_file, content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="{filename}"'
-    return response
-
+    context = {
+        "report": report,
+        "order": order,
+        "items": items,
+        "items_total": items_total,
+        "download_filename": safe_name,
+    }
+    return render(request, "core/servicereport_pdf.html", context)
 # =========================
 # DANE FAKTUROWE (Entity)
 # =========================
@@ -1006,3 +1064,15 @@ def site_contacts_json(request, site_id):
     ]
 
     return JsonResponse({"results": results})
+
+@login_required
+def maintenance_protocol_detail(request, pk):
+    protocol = get_object_or_404(MaintenanceProtocol, pk=pk)
+
+    context = {
+        "protocol": protocol,
+        "site": protocol.site,
+        "work_order": protocol.work_order,
+        "sections": protocol.sections.all().prefetch_related("check_items"),
+    }
+    return render(request, "core/maintenance_protocol_detail.html", context)

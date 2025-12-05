@@ -52,19 +52,6 @@
        class="btn btn-sm btn-outline-secondary">
       ← Zlecenie
     </a>
-    {% if report.pk %}
-      {% if report.status == 'FINAL' %}
-        <a href="{% url 'core:service_report_pdf' report.pk %}" target="_blank"
-          class="btn btn-primary btn-sm">
-          Pobierz PDF
-        </a>
-      {% else %}
-        <a href="{% url 'core:service_report_pdf' report.pk %}" target="_blank"
-          class="btn btn-outline-primary btn-sm">
-          Podgląd PDF (szkic)
-        </a>
-      {% endif %}
-    {% endif %}
   </div>
 </div>
 
