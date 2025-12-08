@@ -127,6 +127,12 @@ urlpatterns = [
     ),
 
     path(
+        "protokoły-konserwacji/<int:pk>/edytuj/",
+        views.maintenance_protocol_edit,
+        name="maintenance_protocol_edit",
+    ),
+
+    path(
         "protokoly-przegladow/",
         views.maintenance_protocol_list,
         name="maintenance_protocol_list",

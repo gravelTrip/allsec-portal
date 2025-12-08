@@ -33,6 +33,7 @@ from .forms import (
     SiteContactForm,
     ServiceReportItemFormSet,
     EntityForm,
+    MaintenanceProtocolForm,
 )
 
 
@@ -1071,14 +1072,47 @@ def site_contacts_json(request, site_id):
 
     return JsonResponse({"results": results})
 
+
+@login_required
+def maintenance_protocol_edit(request, pk):
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("site", "work_order"),
+        pk=pk,
+    )
+
+    site = protocol.site
+    order = protocol.work_order
+
+    if request.method == "POST":
+        form = MaintenanceProtocolForm(request.POST, instance=protocol)
+        if form.is_valid():
+            form.save()
+            return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
+    else:
+        form = MaintenanceProtocolForm(instance=protocol)
+
+    context = {
+        "protocol": protocol,
+        "site": site,
+        "work_order": order,
+        "form": form,
+    }
+    return render(request, "core/maintenance_protocol_form.html", context)
+
+
 @login_required
 def maintenance_protocol_detail(request, pk):
-    protocol = get_object_or_404(MaintenanceProtocol, pk=pk)
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("site", "work_order"),
+        pk=pk,
+    )
 
     context = {
         "protocol": protocol,
         "site": protocol.site,
         "work_order": protocol.work_order,
         "sections": protocol.sections.all().prefetch_related("check_items"),
+        "can_edit": True,  # na razie prosto – każdy zalogowany; później możemy ograniczyć do biura
+        # "can_edit": is_office(request.user),  # jeśli chcesz od razu tylko biuro
     }
     return render(request, "core/maintenance_protocol_detail.html", context)

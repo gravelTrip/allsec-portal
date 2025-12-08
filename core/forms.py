@@ -12,6 +12,7 @@ from .models import (
     Manager,
     ServiceReportItem,
     Entity,
+    MaintenanceProtocol,
 )
 
 
@@ -277,6 +278,43 @@ ServiceReportItemFormSet = inlineformset_factory(
     extra=0,           # ile pustych wierszy ma być domyślnie
     can_delete=True,
 )
+
+class MaintenanceProtocolForm(forms.ModelForm):
+    class Meta:
+        model = MaintenanceProtocol
+        fields = [
+            "date",
+            "next_period_year",
+            "next_period_month",
+            "status",
+        ]
+        widgets = {
+            "date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-sm",
+                }
+            ),
+            "next_period_year": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "min": 2000,
+                }
+            ),
+            "next_period_month": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "min": 1,
+                    "max": 12,
+                }
+            ),
+            "status": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm",
+                }
+            ),
+        }
+
 
 class SiteForm(forms.ModelForm):
     class Meta:

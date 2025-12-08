@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if protocol.number %}
+Protokół {{ protocol.number }} – {{ site.name }}
+{% else %}
+Protokół konserwacji – {{ site.name }}
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-1">
+            Protokół konserwacji
+            {% if protocol.number %}
+            <span class="text-muted fs-6">({{ protocol.number }})</span>
+            {% endif %}
+        </h1>
+
+        <p class="text-muted small mb-0">
+            Obiekt: {{ site.name }}
+            {% if site.city %}
+            ({{ site.city }})
+            {% endif %}
+        </p>
+
+        {% if work_order %}
+        <p class="text-muted small mb-0">
+            Zlecenie:
+            <a href="{% url 'core:workorder_detail' work_order.pk %}">
+                {{ work_order.number }} – {{ work_order.title }}
+            </a>
+        </p>
+        {% endif %}
+
+        <p class="text-muted small mb-0">
+            Okres przeglądu:
+            {% if protocol.period_month and protocol.period_year %}
+            {{ protocol.period_month }}/{{ protocol.period_year }}
+            {% else %}
+            —
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{% url 'core:maintenance_protocol_detail' protocol.pk %}" class="btn btn-sm btn-outline-secondary">
+            Anuluj
+        </a>
+
+        <button type="submit" form="maintenance-protocol-form" class="btn btn-sm btn-primary">
+            Zapisz protokół
+        </button>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <form method="post" id="maintenance-protocol-form" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2 small">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="form-label small">Data wykonania przeglądu</label>
+                    {{ form.date }}
+                    {{ form.date.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small">Miesiąc następnego przeglądu</label>
+                    {{ form.next_period_month }}
+                    {{ form.next_period_month.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small">Rok następnego przeglądu</label>
+                    {{ form.next_period_year }}
+                    {{ form.next_period_year.errors }}
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small">Status</label>
+                    {{ form.status }}
+                    {{ form.status.errors }}
+                </div>
+            </div>
+
+            {# Na razie BEZ edycji sekcji – tylko nagłówek.
+            Sekcje i check-listę dołożymy w kolejnym kroku. #}
+        </form>
+    </div>
+</div>
+{% endblock %}
