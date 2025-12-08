@@ -121,23 +121,23 @@ urlpatterns = [
     ),
 
     path(
-        "protokoły-konserwacji/<int:pk>/",
+        "protokoly-przegladow/<int:pk>/",
         views.maintenance_protocol_detail,
         name="maintenance_protocol_detail",
     ),
 
     path(
-        "protokoły-konserwacji/<int:pk>/edytuj/",
+        "protokoly-przegladow/<int:pk>/edytuj/",
         views.maintenance_protocol_edit,
         name="maintenance_protocol_edit",
     ),
     path(
-        "protokoły-konserwacji/<int:pk>/pdf/",
+        "protokoly-przegladow/<int:pk>/pdf/",
         views.maintenance_protocol_pdf,
         name="maintenance_protocol_pdf",
     ),
     path(
-        "protokoły-konserwacji/<int:pk>/usun/",
+        "protokoly-przegladow//<int:pk>/usun/",
         views.maintenance_protocol_delete,
         name="maintenance_protocol_delete",
     ),
