@@ -64,14 +64,7 @@
     </div>
     <div class="card-body">
       <p class="mb-1"><strong>Lokalizacja:</strong> {{ section.location|default:"—" }}</p>
-      <p class="mb-1">
-        <strong>Wynik sekcji:</strong>
-        {% if section.section_result %}
-        {{ section.get_section_result_display }}
-        {% else %}
-        —
-        {% endif %}
-      </p>
+
 
       <table class="table table-sm mt-3">
         <thead>

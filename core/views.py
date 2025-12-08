@@ -34,6 +34,7 @@ from .forms import (
     ServiceReportItemFormSet,
     EntityForm,
     MaintenanceProtocolForm,
+    MaintenanceCheckItemFormSet,
 )
 
 
@@ -1081,23 +1082,66 @@ def maintenance_protocol_edit(request, pk):
     )
 
     site = protocol.site
-    order = protocol.work_order
+    work_order = protocol.work_order
+
+    # Wszystkie sekcje z punktami
+    sections_qs = protocol.sections.all().prefetch_related("check_items")
 
     if request.method == "POST":
         form = MaintenanceProtocolForm(request.POST, instance=protocol)
-        if form.is_valid():
-            form.save()
-            return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
+
+        section_formsets = []
+        is_valid = form.is_valid()
+
+        for section in sections_qs:
+            formset = MaintenanceCheckItemFormSet(
+                request.POST,
+                queryset=section.check_items.all(),
+                prefix=f"section-{section.pk}",
+            )
+            section_formsets.append({"section": section, "formset": formset})
+            if not formset.is_valid():
+                is_valid = False
+
+                if is_valid:
+                    form.save()
+
+                    # Zapisujemy uwagi (podsumowanie sekcji) dla każdej sekcji
+                    for bundle in section_formsets:
+                        section = bundle["section"]
+                        remarks_field = f"section_{section.pk}_remarks"
+                        new_remarks = (request.POST.get(remarks_field) or "").strip()
+
+                        if new_remarks != (section.section_remarks or ""):
+                            section.section_remarks = new_remarks
+                            section.save(update_fields=["section_remarks"])
+
+                        # zapisujemy też wyniki / notatki z checklisty
+                        bundle["formset"].save()
+
+                    return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
+
+
     else:
         form = MaintenanceProtocolForm(instance=protocol)
+
+        section_formsets = []
+        for section in sections_qs:
+            formset = MaintenanceCheckItemFormSet(
+                queryset=section.check_items.all(),
+                prefix=f"section-{section.pk}",
+            )
+            section_formsets.append({"section": section, "formset": formset})
 
     context = {
         "protocol": protocol,
         "site": site,
-        "work_order": order,
+        "work_order": work_order,
         "form": form,
+        "section_formsets": section_formsets,
     }
     return render(request, "core/maintenance_protocol_form.html", context)
+
 
 
 @login_required

@@ -13,6 +13,7 @@ from .models import (
     ServiceReportItem,
     Entity,
     MaintenanceProtocol,
+    MaintenanceCheckItem,
 )
 
 
@@ -315,6 +316,29 @@ class MaintenanceProtocolForm(forms.ModelForm):
             ),
         }
 
+class MaintenanceCheckItemForm(forms.ModelForm):
+    class Meta:
+        model = MaintenanceCheckItem
+        fields = ["result", "note"]
+        widgets = {
+            "result": forms.Select(
+                attrs={
+                    "class": "form-select form-select-sm",
+                }
+            ),
+            "note": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "rows": 2,
+                }
+            ),
+        }
+
+MaintenanceCheckItemFormSet = forms.modelformset_factory(
+    MaintenanceCheckItem,
+    form=MaintenanceCheckItemForm,
+    extra=0,
+)
 
 class SiteForm(forms.ModelForm):
     class Meta:

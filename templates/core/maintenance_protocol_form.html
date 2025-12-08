@@ -36,8 +36,8 @@ Protokół konserwacji – {{ site.name }}
 
         <p class="text-muted small mb-0">
             Okres przeglądu:
-            {% if protocol.period_month and protocol.period_year %}
-            {{ protocol.period_month }}/{{ protocol.period_year }}
+            {% if protocol.contract_period_display %}
+            {{ protocol.contract_period_display }}
             {% else %}
             —
             {% endif %}
@@ -92,8 +92,89 @@ Protokół konserwacji – {{ site.name }}
                 </div>
             </div>
 
-            {# Na razie BEZ edycji sekcji – tylko nagłówek.
-            Sekcje i check-listę dołożymy w kolejnym kroku. #}
+            <hr class="my-3">
+
+            {# Sekcje i punkty kontrolne #}
+            {% for bundle in section_formsets %}
+            {% with section=bundle.section formset=bundle.formset %}
+            {% if formset.non_form_errors %}
+            <div class="alert alert-danger py-2 small">
+                {{ formset.non_form_errors }}
+            </div>
+            {% endif %}
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <strong>{{ section.header_name }}</strong>
+                    {% if section.manufacturer or section.model %}
+                    – {{ section.manufacturer }} {{ section.model }}
+                    {% endif %}
+                </div>
+
+                <div class="card-body">
+                    <p class="mb-1">
+                        <strong>Lokalizacja:</strong>
+                        {{ section.location|default:"—" }}
+                    </p>
+
+                    {{ formset.management_form }}
+
+                    <div class="table-responsive mt-3">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th style="width: 3rem;">Lp.</th>
+                                    <th style="width: 55%;">Czynność</th>
+                                    <th style="width: 15%;">Wynik</th>
+                                    <th style="width: 27%;">Tekst własny</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item_form in formset %}
+                                <tr>
+                                    <td>
+                                        {{ forloop.counter }}
+                                        {{ item_form.id }}
+                                    </td>
+                                    <td>
+                                        {{ item_form.instance.label }}
+                                    </td>
+                                    <td>
+                                        {{ item_form.result.errors }}
+                                        {{ item_form.result }}
+                                    </td>
+                                    <td>
+                                        {{ item_form.note.errors }}
+                                        {{ item_form.note }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-muted small">
+                                        Brak punktów kontrolnych w tej sekcji.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label small">
+                            Uwagi (podsumowanie sekcji)
+                        </label>
+                        <textarea name="section_{{ section.pk }}_remarks" class="form-control form-control-sm"
+                            rows="3">{{ section.section_remarks|default_if_none:"" }}</textarea>
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+            {% empty %}
+            <p class="text-muted small mb-0">
+                Brak sekcji powiązanych z tym protokołem.
+            </p>
+            {% endfor %}
+
         </form>
     </div>
 </div>
