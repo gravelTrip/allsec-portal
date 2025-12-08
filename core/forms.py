@@ -292,6 +292,9 @@ class SiteForm(forms.ModelForm):
             "google_maps_url",
             "access_info",
             "technical_notes",
+            "maintenance_frequency",
+            "maintenance_start_month",
+            "maintenance_custom_months",
         ]
         widgets = {
             "entity": forms.Select(attrs={"class": "form-select form-select-sm"}),
@@ -313,6 +316,29 @@ class SiteForm(forms.ModelForm):
                 attrs={"class": "form-control form-control-sm", "rows": 3}
             ),
         }
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if "maintenance_frequency" in self.fields:
+            self.fields["maintenance_frequency"].label = "Częstotliwość konserwacji"
+            self.fields["maintenance_frequency"].help_text = (
+                "Brak – bez harmonogramu, Co miesiąc, Co kwartał, 2x w roku, "
+                "lub według wybranych miesięcy."
+            )
+
+        if "maintenance_start_month" in self.fields:
+            self.fields["maintenance_start_month"].label = "Miesiąc startowy"
+            self.fields["maintenance_start_month"].help_text = (
+                "Dla opcji: co miesiąc / co kwartał / 2x w roku. Np. 1 = styczeń."
+            )
+
+        if "maintenance_custom_months" in self.fields:
+            self.fields["maintenance_custom_months"].label = "Miesiące konserwacji (lista)"
+            self.fields["maintenance_custom_months"].help_text = (
+                "Tylko dla trybu 'według wybranych miesięcy'. "
+                "Podaj numery miesięcy oddzielone przecinkami, np. 1,4,7,10."
+            )
 
 class EntityForm(forms.ModelForm):
     class Meta:

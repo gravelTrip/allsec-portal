@@ -3,167 +3,105 @@
 {% block title %}Obiekt {{ site.name }} – ALLSEC Portal{% endblock %}
 
 {% block content %}
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h1 class="h4 mb-1">{{ site.name }}</h1>
-      <p class="mb-0 text-muted small">
-        {% if site.street %}{{ site.street }}, {% endif %}
-        {{ site.postal_code }} {{ site.city }}
-      </p>
-      {% if site.entity %}
-        <p class="mb-0 text-muted small">
-          Dane fakturowe:
-          {{ site.entity.short_name|default:site.entity.name }}
-        </p>
-      {% endif %}
-      {% if site.manager %}
-        <p class="mb-0 text-muted small">
-          Zarządca:
-          <a href="{% url 'core:manager_detail' site.manager.pk %}"
-             class="link-light text-decoration-underline">
-            {{ site.manager.short_name|default:site.manager.full_name }}
-          </a>
-        </p>
-      {% endif %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">{{ site.name }}</h1>
+    {% if site.street or site.postal_code or site.city %}
+    <div class="text-muted small">
+      {{ site.street }}, {{ site.postal_code }} {{ site.city }}
     </div>
-
-    <div class="d-flex align-items-center gap-2">
-      <a href="{% url 'core:site_list' %}" class="btn btn-sm btn-outline-secondary">
-        ← Lista obiektów
+    {% endif %}
+    {% if site.entity %}
+    <div class="small">
+      <strong>Dane fakturowe:</strong> {{ site.entity.name }}
+    </div>
+    {% endif %}
+    {% if site.manager %}
+    <div class="small">
+      <strong>Zarządca:</strong>
+      <a href="{% url 'core:manager_detail' site.manager.pk %}">
+        {{ site.manager.short_name|default:site.manager.full_name }}
       </a>
-      {% if can_edit %}
-        <a href="{% url 'core:site_edit' site.pk %}"
-           class="btn btn-sm btn-primary">
-          Edytuj
-        </a>
-        <form method="post"
-              action="{% url 'core:site_delete' site.pk %}"
-              onsubmit="return confirm('Na pewno usunąć ten obiekt?');">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-sm btn-outline-danger">
-            Usuń
-          </button>
-        </form>
-      {% endif %}
     </div>
-  </div>
-
-  <div class="row">
-    <div class="col-lg-6">
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h6 class="mb-0">Dane obiektu</h6>
-        </div>
-        <div class="card-body small">
-          <div class="mb-1">
-            <span class="text-muted">Typ obiektu:</span>
-            {{ site.get_site_type_display }}
-          </div>
-          {% if site.entity %}
-            <div class="mb-1">
-              <span class="text-muted">Dane fakturowe:</span>
-              {{ site.entity.short_name|default:site.entity.name }}
-            </div>
-          {% endif %}
-          {% if site.manager %}
-            <div class="mb-1">
-              <span class="text-muted">Zarządca:</span>
-              {{ site.manager.short_name|default:site.manager.full_name }}
-            </div>
-          {% endif %}
-          {% if site.google_maps_url %}
-            <div class="mb-1">
-              <span class="text-muted">Lokalizacja:</span>
-              <a href="{{ site.google_maps_url }}" target="_blank">
-                Pokaż na mapie
-              </a>
-            </div>
-          {% endif %}
-
-          {% if site.access_info %}
-            <hr>
-            <div class="mb-0">
-              <span class="text-muted d-block mb-1">Dostęp / wejścia:</span>
-              <pre class="mb-0" style="white-space: pre-wrap;">{{ site.access_info }}</pre>
-            </div>
-          {% endif %}
-        </div>
-      </div>
-
-      {% if site.technical_notes %}
-        <div class="card shadow-sm border-0 mb-3">
-          <div class="card-header bg-white">
-            <h6 class="mb-0">Uwagi techniczne</h6>
-          </div>
-          <div class="card-body small">
-            <pre class="mb-0" style="white-space: pre-wrap;">{{ site.technical_notes }}</pre>
-          </div>
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="col-lg-6">
-      <div class="card shadow-sm border-0 mb-3">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
-    <h6 class="mb-0">Systemy na obiekcie</h6>
-    {% if can_edit %}
-      <a href="{% url 'core:system_create_for_site' site.pk %}"
-         class="btn btn-success btn-sm rounded-circle"
-         title="Dodaj system">
-        +
-      </a>
     {% endif %}
   </div>
-  <div class="card-body small">
-    {% if systems %}
-      <ul class="mb-0 list-unstyled">
-        {% for system in systems %}
-          <li class="d-flex justify-content-between align-items-center mb-1">
-            <div>
-              <strong>{{ system.get_system_type_display }}</strong>
-              {% if system.name %}
-                – {{ system.name }}
-              {% endif %}
-              {% if system.manufacturer %}
-                , {{ system.manufacturer }}
-              {% endif %}
-              {% if system.model %}
-                {{ system.model }}
-              {% endif %}
-              {% if system.in_service_contract %}
-                <span class="badge bg-success ms-1">w umowie</span>
-              {% endif %}
-            </div>
-            <div>
-              <a href="{% url 'core:system_detail' system.pk %}"
-                 class="btn btn-sm btn-outline-primary">
-                Szczegóły
-              </a>
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="text-muted small mb-0">Brak zdefiniowanych systemów.</p>
+
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'core:site_list' %}" class="btn btn-outline-secondary">
+      Powrót do listy
+    </a>
+    {% if can_edit %}
+    <a href="{% url 'core:site_edit' site.pk %}" class="btn btn-primary">
+      Edytuj
+    </a>
+    <a href="{% url 'core:site_delete' site.pk %}" class="btn btn-outline-danger">
+      Usuń
+    </a>
     {% endif %}
   </div>
 </div>
 
-      <div class="card shadow-sm border-0 mb-3">
-  <div class="card-header bg-white d-flex justify-content-between align-items-center">
-    <h6 class="mb-0">Powiązane kontakty</h6>
-    {% if can_edit %}
-      <a href="{% url 'core:sitecontact_create' site.pk %}"
-         class="btn btn-success btn-sm rounded-circle"
-         title="Dodaj powiązanie kontaktu">
-        +
-      </a>
-    {% endif %}
-  </div>
-  <div class="card-body small">
-    {% if site_contacts %}
-      <ul class="mb-0 list-unstyled">
-        {% for link in site_contacts %}
+<div class="row">
+
+
+  {# PRAWA KOLUMNA: Dane obiektu + Powiązane kontakty #}
+  <div class="col-lg-6">
+    {# Dane obiektu #}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Dane obiektu</h6>
+      </div>
+      <div class="card-body small">
+        <div class="mb-1">
+          <span class="text-muted">Typ obiektu:</span>
+          {{ site.get_site_type_display }}
+        </div>
+        {% if site.entity %}
+        <div class="mb-1">
+          <span class="text-muted">Dane fakturowe:</span>
+          {{ site.entity.short_name|default:site.entity.name }}
+        </div>
+        {% endif %}
+        {% if site.manager %}
+        <div class="mb-1">
+          <span class="text-muted">Zarządca:</span>
+          {{ site.manager.short_name|default:site.manager.full_name }}
+        </div>
+        {% endif %}
+        {% if site.google_maps_url %}
+        <div class="mb-1">
+          <span class="text-muted">Lokalizacja:</span>
+          <a href="{{ site.google_maps_url }}" target="_blank">
+            Pokaż na mapie
+          </a>
+        </div>
+        {% endif %}
+
+        {% if site.access_info %}
+        <hr>
+        <div class="mb-0">
+          <span class="text-muted d-block mb-1">Dostęp / wejścia:</span>
+          <pre class="mb-0" style="white-space: pre-wrap;">{{ site.access_info }}</pre>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Powiązane kontakty #}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Powiązane kontakty</h6>
+        {% if can_edit %}
+        <a href="{% url 'core:sitecontact_create' site.pk %}" class="btn btn-success btn-sm"
+          title="Dodaj powiązanie kontaktu">
+          Dodaj
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body small">
+        {% if site_contacts %}
+        <ul class="mb-0 list-unstyled">
+          {% for link in site_contacts %}
           <li class="d-flex justify-content-between align-items-center mb-1">
             <div>
               {{ link.contact }}
@@ -171,25 +109,122 @@
                 – {{ link.get_role_display }}
               </span>
               {% if link.is_default_for_notifications %}
-                <span class="badge bg-primary ms-1">domyślny</span>
+              <span class="badge bg-primary ms-1">domyślny</span>
               {% endif %}
             </div>
             <div>
-              <a href="{% url 'core:contact_detail' link.contact.pk %}"
-   class="btn btn-sm btn-outline-primary">
-  Szczegóły
-</a>
+              <a href="{% url 'core:contact_detail' link.contact.pk %}" class="btn btn-sm btn-outline-primary">
+                Szczegóły
+              </a>
             </div>
           </li>
-        {% endfor %}
-      </ul>
-    {% else %}
-      <p class="text-muted small mb-0">
-        Brak przypisanych osób kontaktowych.
-      </p>
-    {% endif %}
-  </div>
-</div>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted small mb-0">
+          Brak przypisanych osób kontaktowych.
+        </p>
+        {% endif %}
+      </div>
     </div>
   </div>
+
+  {# LEWA KOLUMNA: Systemy + Konserwacje #}
+  <div class="col-lg-6">
+    {# Systemy na obiekcie #}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Systemy na obiekcie</h6>
+        {% if can_edit %}
+        <a href="{% url 'core:system_create_for_site' site.pk %}" class="btn btn-success btn-sm" title="Dodaj system">
+          Dodaj
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body small">
+        {% if systems %}
+        <ul class="mb-0 list-unstyled">
+          {% for system in systems %}
+          <li class="d-flex justify-content-between align-items-center mb-1">
+            <div>
+              <strong>{{ system.get_system_type_display }}</strong>
+              {% if system.name %}
+              – {{ system.name }}
+              {% endif %}
+              {% if system.manufacturer %}
+              , {{ system.manufacturer }}
+              {% endif %}
+              {% if system.model %}
+              {{ system.model }}
+              {% endif %}
+              {% if system.in_service_contract %}
+              <span class="badge bg-success ms-1">w umowie</span>
+              {% endif %}
+            </div>
+            <div>
+              <a href="{% url 'core:system_detail' system.pk %}" class="btn btn-sm btn-outline-primary">
+                Szczegóły
+              </a>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-muted small mb-0">Brak zdefiniowanych systemów.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Konserwacje (harmonogram) #}
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Konserwacje (harmonogram)</h6>
+      </div>
+      <div class="card-body small">
+        {% if site.maintenance_frequency %}
+        <p class="mb-1">
+          <strong>Częstotliwość:</strong>
+          {{ site.get_maintenance_frequency_display }}
+        </p>
+
+        {% with months=site.maintenance_months %}
+        {% if months %}
+        <p class="mb-1">
+          <strong>Miesiące konserwacji:</strong>
+          {{ months|join:", " }}
+        </p>
+        {% endif %}
+        {% endwith %}
+
+        {% with next=site.get_next_maintenance_period %}
+        {% if next %}
+        {% with year=next.0 month=next.1 %}
+        <p class="mb-1">
+          <strong>Najbliższa planowana konserwacja:</strong>
+          {{ month|stringformat:"02d" }}/{{ year }}
+        </p>
+        {% endwith %}
+        {% endif %}
+        {% endwith %}
+        {% else %}
+        <p class="text-muted mb-0">
+          Brak zdefiniowanego harmonogramu konserwacji dla tego obiektu.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Uwagi techniczne na pełną szerokość #}
+{% if site.technical_notes %}
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-header bg-white">
+    <h6 class="mb-0">Uwagi techniczne</h6>
+  </div>
+  <div class="card-body small">
+    <pre class="mb-0" style="white-space: pre-wrap;">{{ site.technical_notes }}</pre>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
