@@ -294,6 +294,7 @@ class SiteForm(forms.ModelForm):
             "technical_notes",
             "maintenance_frequency",
             "maintenance_start_month",
+            "maintenance_execution_month_in_period",
             "maintenance_custom_months",
         ]
         widgets = {
@@ -316,7 +317,7 @@ class SiteForm(forms.ModelForm):
                 attrs={"class": "form-control form-control-sm", "rows": 3}
             ),
         }
-        
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -332,6 +333,14 @@ class SiteForm(forms.ModelForm):
             self.fields["maintenance_start_month"].help_text = (
                 "Dla opcji: co miesiąc / co kwartał / 2x w roku. Np. 1 = styczeń."
             )
+
+        if "maintenance_execution_month_in_period": forms.NumberInput(
+                attrs={
+                    "class": "form-control form-control-sm",
+                    "min": 1,
+                    "max": 12,
+                }
+        )
 
         if "maintenance_custom_months" in self.fields:
             self.fields["maintenance_custom_months"].label = "Miesiące konserwacji (lista)"

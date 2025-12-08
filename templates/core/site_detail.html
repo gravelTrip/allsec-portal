@@ -188,13 +188,19 @@
         </p>
 
         {% with months=site.maintenance_months %}
-        {% if months %}
-        <p class="mb-1">
-          <strong>Miesiące konserwacji:</strong>
-          {{ months|join:", " }}
-        </p>
-        {% endif %}
+
         {% endwith %}
+
+        <p class="mb-1">
+          <strong>Miesiące wykonawcze:</strong>
+          {% if site.execution_months %}
+          {% for m in site.execution_months %}
+          {{ m }}{% if not forloop.last %}, {% endif %}
+          {% endfor %}
+          {% else %}
+          —
+          {% endif %}
+        </p>
 
         {% with next=site.get_next_maintenance_period %}
         {% if next %}

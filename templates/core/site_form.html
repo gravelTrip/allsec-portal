@@ -130,6 +130,20 @@
               </div>
 
               <div class="mb-2">
+                {{ form.maintenance_execution_month_in_period.label_tag }}
+                {{ form.maintenance_execution_month_in_period }}
+                <small class="form-text text-muted">
+                  1 = pierwszy miesiąc okresu, 2 = drugi, 3 = trzeci itd.
+                  Dla kwartalnych: 1–3. Dla 2x w roku: 1–6.
+                </small>
+                {% if form.maintenance_execution_month_in_period.errors %}
+                <div class="text-danger small">
+                  {{ form.maintenance_execution_month_in_period.errors|striptags }}
+                </div>
+                {% endif %}
+              </div>
+
+              <div class="mb-2">
                 {{ form.maintenance_custom_months.label_tag }}
                 {{ form.maintenance_custom_months }}
                 {% if form.maintenance_custom_months.help_text %}

@@ -1,151 +1,150 @@
 {% extends "base.html" %}
 
-{% block title %}Protokoły przeglądów – ALLSEC Portal{% endblock %}
+{% block title %}Protokoły konserwacji – ALLSEC Portal{% endblock %}
 
 {% block content %}
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-0">Protokoły przeglądów</h1>
-      <p class="text-muted small mb-0">
-        Lista protokołów konserwacji powiązanych ze zleceniami przeglądów okresowych.
-      </p>
-    </div>
-
-    {# Na razie bez rozbudowanych filtrów – jak w PS można potem dodać #}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0">Protokoły konserwacji</h1>
+    <p class="text-muted small mb-0">
+      Lista protokołów konserwacji powiązanych ze zleceniami.
+    </p>
   </div>
 
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-0">
-        <table class="table table-hover mb-0 align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Numer</th>
-              <th>Okres</th>
-              <th>Następny przegląd</th>
-              <th>Obiekt</th>
-              <th>Zlecenie</th>
-              <th style="width: 80px;"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for protocol in page_obj %}
-              <tr>
-                {# NUMER – sam tekst, bez linku #}
-                <td>
-                  {{ protocol.number|default:"(brak numeru)" }}
-                </td>
+  {# Na razie bez rozbudowanych filtrów – jak w PS można potem dodać #}
+</div>
 
-                {# OKRES – za jaki okres jest przegląd #}
-                <td>
-                  {% if protocol.period_month and protocol.period_year %}
-                    {{ protocol.period_month|add:""|stringformat:"02d" }}/{{ protocol.period_year }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Numer</th>
+          <th>Okres</th>
+          <th>Następny przegląd</th>
+          <th>Obiekt</th>
+          <th>Zlecenie</th>
+          <th style="width: 80px;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for protocol in page_obj %}
+        <tr>
+          {# NUMER – sam tekst, bez linku #}
+          <td>
+            {{ protocol.number|default:"(brak numeru)" }}
+          </td>
 
-                {# NASTĘPNY PRZEGLĄD #}
-                <td>
-                  {% if protocol.next_period_month and protocol.next_period_year %}
-                    {{ protocol.next_period_month|add:""|stringformat:"02d" }}/{{ protocol.next_period_year }}
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+          {# OKRES – zakres wg umowy #}
+          <td>
+            {% if protocol.contract_period_display %}
+            {{ protocol.contract_period_display }}
+            {% elif protocol.period_display %}
+            {{ protocol.period_display }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
 
-                {# OBIEKT – u góry nazwa, na dole miasto mniejszą czcionką (jak w PS) #}
-                <td>
-                  {% if protocol.site %}
-                    {{ protocol.site.name }}<br>
-                    <span class="small text-muted">
-                      {{ protocol.site.city }}
-                    </span>
-                  {% else %}
-                    &#8212;
-                  {% endif %}
-                </td>
+          {# NASTĘPNY PRZEGLĄD #}
+          <td>
+            {% if protocol.next_period_display %}
+            {{ protocol.next_period_display }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
 
-                {# ZLECENIE – numer ZL xx-xx-xxxx + tytuł (jak w PS) #}
-                <td>
-                  {% if protocol.work_order %}
-                    <div class="fw-semibold">
-                      {# jeśli WorkOrder ma atrybut number (np. "ZL 12-10-2025"), użyjemy go; inaczej fallback #}
-                      {% if protocol.work_order.number %}
-                        {{ protocol.work_order.number }}
-                      {% else %}
-                        ZL #{{ protocol.work_order.id }}
-                      {% endif %}
-                    </div>
-                  {% else %}
-                    —
-                  {% endif %}
-                </td>
+          {# OBIEKT – u góry nazwa, na dole miasto mniejszą czcionką (jak w PS) #}
+          <td>
+            {% if protocol.site %}
+            {{ protocol.site.name }}<br>
+            <span class="small text-muted">
+              {{ protocol.site.city }}
+            </span>
+            {% else %}
+            &#8212;
+            {% endif %}
+          </td>
 
-                {# AKCJE – tylko niebieski przycisk "Szczegóły" #}
-                <td>
-                  <a
-                    href="{% url 'core:maintenance_protocol_detail' protocol.pk %}"
-                    class="btn btn-sm btn-primary w-100"
-                  >
-                    Szczegóły
-                  </a>
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="6" class="text-center text-muted py-3">
-                  Brak protokołów konserwacji do wyświetlenia.
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      {% if page_obj.paginator.num_pages > 1 %}
-        <div class="border-top px-3 py-2">
-          <nav aria-label="Paginacja protokołów">
-            <ul class="pagination pagination-sm mb-0">
-              {% if page_obj.has_previous %}
-                <li class="page-item">
-                  <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
-                    &laquo;
-                  </a>
-                </li>
+          {# ZLECENIE – numer ZL xx-xx-xxxx + tytuł (jak w PS) #}
+          <td>
+            {% if protocol.work_order %}
+            <div class="fw-semibold">
+              {# jeśli WorkOrder ma atrybut number (np. "ZL 12-10-2025"), użyjemy go; inaczej fallback #}
+              {% if protocol.work_order.number %}
+              {{ protocol.work_order.number }}
               {% else %}
-                <li class="page-item disabled">
-                  <span class="page-link">&laquo;</span>
-                </li>
+              ZL #{{ protocol.work_order.id }}
               {% endif %}
+            </div>
+            {% else %}
+            —
+            {% endif %}
+          </td>
 
-              {% for num in page_obj.paginator.page_range %}
-                {% if num == page_obj.number %}
-                  <li class="page-item active">
-                    <span class="page-link">{{ num }}</span>
-                  </li>
-                {% else %}
-                  <li class="page-item">
-                    <a class="page-link" href="?page={{ num }}">
-                      {{ num }}
-                    </a>
-                  </li>
-                {% endif %}
-              {% endfor %}
-
-              {% if page_obj.has_next %}
-                <li class="page-item">
-                  <a class="page-link" href="?page={{ page_obj.next_page_number }}">
-                    &raquo;
-                  </a>
-                </li>
-              {% else %}
-                <li class="page-item disabled">
-                  <span class="page-link">&raquo;</span>
-                </li>
-              {% endif %}
-            </ul>
-          </nav>
-        </div>
-      {% endif %}
+          {# AKCJE – tylko niebieski przycisk "Szczegóły" #}
+          <td>
+            <a href="{% url 'core:maintenance_protocol_detail' protocol.pk %}" class="btn btn-sm btn-primary w-100">
+              Szczegóły
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" class="text-center text-muted py-3">
+            Brak protokołów konserwacji do wyświetlenia.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div class="border-top px-3 py-2">
+    <nav aria-label="Paginacja protokołów">
+      <ul class="pagination pagination-sm mb-0">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+            &laquo;
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">&laquo;</span>
+        </li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+        {% if num == page_obj.number %}
+        <li class="page-item active">
+          <span class="page-link">{{ num }}</span>
+        </li>
+        {% else %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}">
+            {{ num }}
+          </a>
+        </li>
+        {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+            &raquo;
+          </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">&raquo;</span>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

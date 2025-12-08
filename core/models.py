@@ -6,7 +6,7 @@ from django.db.models import Max
 
 from datetime import date
 from django.utils.translation import gettext_lazy as _
-
+import calendar
 
 
 class Entity(models.Model):
@@ -174,6 +174,17 @@ class Site(models.Model):
         help_text="Używane dla schematów co miesiąc / kwartał / 2x w roku.",
     )
 
+    maintenance_execution_month_in_period = models.PositiveSmallIntegerField(
+        default=1,
+        null=True,
+        blank=True,
+        verbose_name="Miesiąc wykonania w okresie",
+        help_text=(
+            "Dla przeglądów co kwartał: 1–3 (1 = pierwszy miesiąc kwartału itd.). "
+            "Dla 2x w roku: 1–6. Dla miesięcznych zazwyczaj 1."
+        ),
+    )
+
     # Prosty sposób na custom: lista miesięcy 1–12 jako tekst, np. '1,4,7,10'
     maintenance_custom_months = models.CharField(
         max_length=50,
@@ -224,27 +235,109 @@ class Site(models.Model):
             return sorted(((start + i * 6 - 1) % 12) + 1 for i in range(2))
 
         return []
+    
+    @property
+    def execution_months(self):
+        """
+        Zwraca listę nazw miesięcy, w których faktycznie wykonujemy konserwacje
+        (wg maintenance_execution_month_in_period).
+        """
+        freq = self.maintenance_frequency
+        start = self.maintenance_start_month
+        exec_in_period = self.maintenance_execution_month_in_period or 1
+
+        if not freq or not start:
+            return []
+
+        months = []
+
+        if freq == self.MaintenanceFrequency.MONTHLY:
+            # co miesiąc – wszystkie miesiące
+            months = list(range(1, 13))
+        elif freq == self.MaintenanceFrequency.QUARTERLY:
+            period_length = 3
+            for i in range(4):
+                period_start = (start - 1 + i * period_length) % 12  # 0..11
+                exec_idx = period_start + (exec_in_period - 1)
+                months.append(exec_idx % 12 + 1)
+        elif freq == self.MaintenanceFrequency.SEMIANNUAL:
+            period_length = 6
+            for i in range(2):
+                period_start = (start - 1 + i * period_length) % 12
+                exec_idx = period_start + (exec_in_period - 1)
+                months.append(exec_idx % 12 + 1)
+        else:
+            # CUSTOM lub None – na razie nie wyliczamy, żeby nie zgadywać
+            return []
+
+        # Zamień na polskie nazwy miesięcy
+        month_names = []
+        for m in sorted(set(months)):
+            # calendar.month_name[1] = "January" – u Ciebie i tak jest UI PL,
+            # więc możesz to później podmienić na własną mapę nazw.
+            month_names.append(str(m).zfill(2))
+        return month_names
+
+
 
     def get_next_maintenance_period(self, from_year: int, from_month: int):
         """
         Zwraca (year, month) dla następnego planowego przeglądu
-        liczonego względem podanego okresu (rok, miesiąc).
-        Jeśli obiekt nie ma ustawionych miesięcy – zwraca (None, None).
+        liczonego względem PODANEGO miesiąca wykonania (rok, miesiąc).
+
+        - MIESIĘCZNIE: +1 miesiąc
+        - KWARTALNIE: +3 miesiące
+        - 2x W ROKU:  +6 miesięcy
+        - CUSTOM:     wg maintenance_custom_months (jak dotychczas)
         """
-        months = self.maintenance_months
-        if not months:
+        freq = self.maintenance_frequency
+
+        # zabezpieczenie na bzdurne dane
+        if not (1 <= from_month <= 12):
             return None, None
 
-        current_year = from_year
-        current_month = from_month
+        # CUSTOM – zostawiamy starą logikę opartą o maintenance_months
+        if freq == self.MaintenanceFrequency.CUSTOM:
+            months = self.maintenance_months
+            if not months:
+                return None, None
 
-        # Szukamy najbliższego miesiąca z listy > current_month
-        future_months = [m for m in months if m > current_month]
-        if future_months:
-            return current_year, min(future_months)
+            current_year = from_year
+            current_month = from_month
 
-        # Jeśli brak większego w tym roku – bierzemy pierwszy miesiąc z listy w kolejnym roku
-        return current_year + 1, min(months)
+            future_months = [m for m in months if m > current_month]
+            if future_months:
+                return current_year, min(future_months)
+
+            return current_year + 1, min(months)
+
+        # Brak stałych przeglądów
+        if freq == self.MaintenanceFrequency.NONE:
+            return None, None
+
+        # MIESIĘCZNIE – po prostu kolejny miesiąc
+        if freq == self.MaintenanceFrequency.MONTHLY:
+            if from_month == 12:
+                return from_year + 1, 1
+            return from_year, from_month + 1
+
+        # Helper do przesuwania o N miesięcy z obsługą przełomu roku
+        def add_months(year: int, month: int, delta: int):
+            total = year * 12 + (month - 1) + delta
+            new_year = total // 12
+            new_month = (total % 12) + 1
+            return new_year, new_month
+
+        # KWARTALNIE – +3 miesiące od wykonania
+        if freq == self.MaintenanceFrequency.QUARTERLY:
+            return add_months(from_year, from_month, 3)
+
+        # 2x W ROKU – +6 miesięcy od wykonania
+        if freq == self.MaintenanceFrequency.SEMIANNUAL:
+            return add_months(from_year, from_month, 6)
+
+        # fallback
+        return None, None
 
 class Contact(models.Model):
     """Osoba kontaktowa: zarządca, administrator, właściciel, dozorca itp."""
@@ -1066,6 +1159,74 @@ class MaintenanceProtocol(models.Model):
             order_counter += 1
 
         return created_sections
+    
+    @property
+    def period_display(self):
+        """Napis typu 02/2025 albo pusty string, jeśli brak danych."""
+        if self.period_month and self.period_year:
+            return f"{self.period_month:02d}/{self.period_year}"
+        return ""
+
+    @property
+    def next_period_display(self):
+        """Napis typu 05/2025 dla następnego przeglądu."""
+        if self.next_period_month and self.next_period_year:
+            return f"{self.next_period_month:02d}/{self.next_period_year}"
+        return ""
+    @property
+    def contract_period_bounds(self):
+        """
+        Zwraca (start_year, start_month, end_year, end_month)
+        dla okresu wg umowy, wyliczonego z częstotliwości i miesiąca wykonania.
+        """
+        site = self.site
+        if not site or not self.period_year or not self.period_month:
+            return None
+
+        freq = getattr(site, "maintenance_frequency", None)
+        exec_year = self.period_year
+        exec_month = self.period_month
+
+        # domyślnie traktujemy jako 1 miesiąc (miesięczne, brak danych, custom)
+        period_length = 1
+        if freq == Site.MaintenanceFrequency.QUARTERLY:
+            period_length = 3
+        elif freq == Site.MaintenanceFrequency.SEMIANNUAL:
+            period_length = 6
+
+        # Który miesiąc okresu jest miesiącem wykonania (1..period_length)
+        exec_in_period = getattr(site, "maintenance_execution_month_in_period", 1) or 1
+        if exec_in_period < 1:
+            exec_in_period = 1
+        if exec_in_period > period_length:
+            exec_in_period = period_length
+
+        # Przeliczamy na "absolutne" numery miesięcy (rok*12 + (miesiąc-1))
+        exec_abs = exec_year * 12 + (exec_month - 1)
+        start_abs = exec_abs - (exec_in_period - 1)
+        end_abs = start_abs + (period_length - 1)
+
+        start_year = start_abs // 12
+        start_month = start_abs % 12 + 1
+        end_year = end_abs // 12
+        end_month = end_abs % 12 + 1
+        return (start_year, start_month, end_year, end_month)
+
+    @property
+    def contract_period_display(self):
+        """
+        Ładny napis typu:
+        - '02/2025' (miesięczne),
+        - '01/2025-03/2025' (kwartalne/półroczne).
+        """
+        bounds = self.contract_period_bounds
+        if not bounds:
+            return ""
+        sy, sm, ey, em = bounds
+        if sy == ey and sm == em:
+            return f"{sm:02d}/{sy}"
+        return f"{sm:02d}/{sy}-{em:02d}/{ey}"
+
 
 
 
