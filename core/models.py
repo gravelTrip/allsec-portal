@@ -1576,9 +1576,10 @@ class ServiceReportItem(models.Model):
     """Pozycja rozliczeniowa na protokole serwisowym (RBH, dojazd, materiały…)."""
 
     class Unit(models.TextChoices):
-        RBH = "RBH", "rbh"
         PIECE = "SZT", "szt."
-        KM = "KM", "km"
+        SERVICE = "USL", "usł."
+        RBH = "RBH", "rbh."
+        SET = "KPL", "kpl."
         OTHER = "INNE", "inne"
 
     report = models.ForeignKey(

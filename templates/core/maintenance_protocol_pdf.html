@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}
+{% if protocol.number %}
+{{ protocol.number }} – wydruk
+{% else %}
+Protokół konserwacji – wydruk
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container my-3">
+    {# Pasek tylko na ekranie, znika w wydruku #}
+    <div class="d-print-none mb-3">
+        <a href="{% url 'core:maintenance_protocol_detail' protocol.pk %}" class="btn btn-sm btn-outline-secondary">
+            &larr; Powrót do protokołu
+        </a>
+        <button type="button" class="btn btn-sm btn-primary" onclick="window.print()">
+            Drukuj
+        </button>
+    </div>
+
+    <h1 class="h5 mb-1">
+        Protokół konserwacji
+        {% if protocol.number %}
+        <span class="text-muted">({{ protocol.number }})</span>
+        {% endif %}
+    </h1>
+
+    <p class="mb-1 small">
+        <strong>Obiekt:</strong> {{ site.name }}<br>
+        <strong>Okres:</strong>
+        {% if protocol.contract_period_display %}
+        {{ protocol.contract_period_display }} (wg umowy)
+        {% else %}
+        —
+        {% endif %}<br>
+        <strong>Wykonanie:</strong>
+        {% if protocol.period_display %}
+        {{ protocol.period_display }}
+        {% else %}
+        —
+        {% endif %}
+    </p>
+
+    <hr>
+
+    {% for section in sections %}
+    <h2 class="h6 mt-3 mb-1">
+        {{ section.header_name }}
+    </h2>
+    <p class="mb-1 small">
+        <strong>Lokalizacja:</strong> {{ section.location|default:"—" }}
+    </p>
+
+    <table class="table table-sm mt-2">
+        <thead>
+            <tr>
+                <th style="width: 55%;">Czynność</th>
+                <th style="width: 10%;">Wynik</th>
+                <th style="width: 35%;">Tekst własny</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in section.check_items.all %}
+            {% if item.active %}
+            <tr>
+                <td>{{ item.label }}</td>
+                <td>
+                    {% if item.result %}
+                    {{ item.get_result_display }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </td>
+                <td>{{ item.note|linebreaksbr }}</td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if section.section_remarks %}
+    <p class="small mb-0">
+        <strong>Uwagi (podsumowanie sekcji):</strong><br>
+        {{ section.section_remarks|linebreaksbr }}
+    </p>
+    {% endif %}
+    {% endfor %}
+</div>
+{% endblock %}

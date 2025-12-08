@@ -3,13 +3,13 @@
 {% block title %}Zlecenie #{{ order.id }} – ALLSEC Portal{% endblock %}
 
 {% block content %}
-  <div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h1 class="h4 mb-1">
       {% if order.number %}
-        Zlecenie {{ order.number }} – {{ order.title }}
+      Zlecenie {{ order.number }} – {{ order.title }}
       {% else %}
-        Zlecenie #{{ order.id }} – {{ order.title }}
+      Zlecenie #{{ order.id }} – {{ order.title }}
       {% endif %}
     </h1>
     <p class="mb-1">
@@ -17,7 +17,7 @@
       {{ order.created_at|date:"d.m.Y H:i" }}
     </p>
     <p class="text-muted small mb-0">
-      Szczegóły zlecenia serwisowego / przeglądu / robót.
+      Szczegóły zlecenia serwisowego / konserwacji / montażu.
     </p>
   </div>
 
@@ -27,234 +27,236 @@
     </a>
 
     {% if can_edit %}
-      <a href="{% url 'core:workorder_edit' order.pk %}" class="btn btn-sm btn-primary">
-        Edytuj zlecenie
-      </a>
+    <a href="{% url 'core:workorder_edit' order.pk %}" class="btn btn-sm btn-primary">
+      Edytuj zlecenie
+    </a>
     {% endif %}
   </div>
 </div>
 
-  <div class="row g-3">
-    <!-- LEWA KOLUMNA: podstawowe info -->
-    <div class="col-lg-6">
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h6 class="mb-0">Informacje o zleceniu</h6>
-        </div>
-        <div class="card-body small">
-          <div class="mb-2">
-            <span class="text-muted">Typ:</span>
-            {% if order.work_type == order.WorkOrderType.SERVICE %}
-              <span class="badge bg-danger ms-1">Serwis</span>
-            {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-              <span class="badge bg-info text-dark ms-1">Przegląd</span>
-            {% elif order.work_type == order.WorkOrderType.JOB %}
-              <span class="badge bg-secondary ms-1">Robota</span>
-            {% else %}
-              <span class="badge bg-light text-dark ms-1">Inne</span>
-            {% endif %}
-          </div>
-
-          <div class="mb-2">
-            <span class="text-muted small">Status:</span>
-            {% if order.status == order.Status.NEW %}
-              <span class="badge bg-primary">Nowe</span>
-
-            {% elif order.status == order.Status.SCHEDULED %}
-              <span class="badge bg-info text-dark">Umówione</span>
-
-            {% elif order.status == order.Status.IN_PROGRESS %}
-              <span class="badge bg-warning text-dark">W realizacji</span>
-
-            {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-              <span class="badge bg-secondary">Czeka na decyzję</span>
-
-            {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-              <span class="badge bg-secondary">Czeka na materiał</span>
-
-            {% elif order.status == order.Status.COMPLETED %}
-              <span class="badge bg-success">Zakończone</span>
-
-            {% elif order.status == order.Status.CANCELLED %}
-              <span class="badge bg-danger">Odwołane</span>
-
-            {% else %}
-              <span class="badge bg-light text-dark">Inny</span>
-            {% endif %}
-          </div>
-
-          <div class="mb-2">
-            <span class="text-muted">Termin realizacji:</span>
-            {{ order.planned_date|date:"d.m.Y" }}
-          </div>
-
-          <div class="mb-2">
-            <span class="text-muted">Przypisano do:</span>
-            {% if order.assigned_to %}
-              {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
-            {% else %}
-              <span class="text-muted">nieprzypisane</span>
-            {% endif %}
-          </div>
-
-          {% if order.job %}
-            <div class="mb-0">
-              <span class="text-muted">Powiązana robota:</span>
-              {{ order.job.name|default:order.job.id }}
-            </div>
-          {% endif %}
-        </div>
+<div class="row g-3">
+  <!-- LEWA KOLUMNA: podstawowe info -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Informacje o zleceniu</h6>
       </div>
+      <div class="card-body small">
+        <div class="mb-2">
+          <span class="text-muted">Typ:</span>
+          {% if order.work_type == order.WorkOrderType.SERVICE %}
+          <span class="badge bg-danger ms-1">Serwis</span>
+          {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+          <span class="badge bg-info text-dark ms-1">Przegląd</span>
+          {% elif order.work_type == order.WorkOrderType.JOB %}
+          <span class="badge bg-secondary ms-1">Robota</span>
+          {% else %}
+          <span class="badge bg-light text-dark ms-1">Inne</span>
+          {% endif %}
+        </div>
 
-      <div class="card shadow-sm border-0">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Obiekt</h6>
-          {% if order.site %}
-            <a href="{% url 'core:site_detail' order.site.pk %}"
-              class="btn btn-sm btn-outline-primary">
-              Szczegóły
-            </a>
+        <div class="mb-2">
+          <span class="text-muted small">Status:</span>
+          {% if order.status == order.Status.NEW %}
+          <span class="badge bg-primary">Nowe</span>
+
+          {% elif order.status == order.Status.SCHEDULED %}
+          <span class="badge bg-info text-dark">Umówione</span>
+
+          {% elif order.status == order.Status.IN_PROGRESS %}
+          <span class="badge bg-warning text-dark">W realizacji</span>
+
+          {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+          <span class="badge bg-secondary">Czeka na decyzję</span>
+
+          {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+          <span class="badge bg-secondary">Czeka na materiał</span>
+
+          {% elif order.status == order.Status.COMPLETED %}
+          <span class="badge bg-success">Zakończone</span>
+
+          {% elif order.status == order.Status.CANCELLED %}
+          <span class="badge bg-danger">Odwołane</span>
+
+          {% else %}
+          <span class="badge bg-light text-dark">Inny</span>
           {% endif %}
         </div>
-        <div class="card-body small">
-          <div class="mb-1">
-            <strong>{{ order.site.name }}</strong>
-          </div>
-          <div class="mb-1">
-            {% if order.site.street %}
-              {{ order.site.street }}
-            {% endif %}
-          </div>
-          <div class="mb-1">
-            {% if order.site.postal_code or order.site.city %}
-              {{ order.site.postal_code }} {{ order.site.city }}
-            {% endif %}
-          </div>
-          {% if order.site.manager %}
-            <div class="mt-2">
-              <span class="text-muted">Zarządca:</span>
-              {{ order.site.manager.short_name|default:order.site.manager.full_name }}
-            </div>
+
+        <div class="mb-2">
+          <span class="text-muted">Termin realizacji:</span>
+          {{ order.planned_date|date:"d.m.Y" }}
+        </div>
+
+        <div class="mb-2">
+          <span class="text-muted">Przypisano do:</span>
+          {% if order.assigned_to %}
+          {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+          {% else %}
+          <span class="text-muted">nieprzypisane</span>
           {% endif %}
         </div>
+
+        {% if order.job %}
+        <div class="mb-0">
+          <span class="text-muted">Powiązana robota:</span>
+          {{ order.job.name|default:order.job.id }}
+        </div>
+        {% endif %}
       </div>
     </div>
 
-    <!-- PRAWA KOLUMNA: opis, systemy, protokół -->
-    <div class="col-lg-6">
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h6 class="mb-0">Opis zgłoszenia</h6>
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Obiekt</h6>
+        {% if order.site %}
+        <a href="{% url 'core:site_detail' order.site.pk %}" class="btn btn-sm btn-outline-primary">
+          Szczegóły
+        </a>
+        {% endif %}
+      </div>
+      <div class="card-body small">
+        <div class="mb-1">
+          <strong>{{ order.site.name }}</strong>
         </div>
-        <div class="card-body small">
-          {% if order.description %}
-            <p class="mb-0" style="white-space: pre-wrap;">{{ order.description }}</p>
-          {% else %}
-            <p class="text-muted mb-0 small">Brak opisu.</p>
+        <div class="mb-1">
+          {% if order.site.street %}
+          {{ order.site.street }}
           {% endif %}
         </div>
-      </div>
-
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white d-flex justify-content-between align-items-center">
-          <h6 class="mb-0">Systemy objęte zleceniem</h6>
+        <div class="mb-1">
+          {% if order.site.postal_code or order.site.city %}
+          {{ order.site.postal_code }} {{ order.site.city }}
+          {% endif %}
         </div>
-        <div class="card-body small">
-    {% with systems=order.systems.all %}
-      {% if systems %}
+        {% if order.site.manager %}
+        <div class="mt-2">
+          <span class="text-muted">Zarządca:</span>
+          {{ order.site.manager.short_name|default:order.site.manager.full_name }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- PRAWA KOLUMNA: opis, systemy, protokół -->
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white">
+        <h6 class="mb-0">Opis zgłoszenia</h6>
+      </div>
+      <div class="card-body small">
+        {% if order.description %}
+        <p class="mb-0" style="white-space: pre-wrap;">{{ order.description }}</p>
+        {% else %}
+        <p class="text-muted mb-0 small">Brak opisu.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Systemy objęte zleceniem</h6>
+      </div>
+      <div class="card-body small">
+        {% with systems=order.systems.all %}
+        {% if systems %}
         <ul class="mb-0 list-unstyled">
           {% for system in systems %}
-            <li class="d-flex justify-content-between align-items-center mb-1">
-              <div>
-                <strong>{{ system.get_system_type_display }}</strong>
-                {% if system.name %}
-                  – {{ system.name }}
-                {% endif %}
-                {% if system.manufacturer %}
-                  , {{ system.manufacturer }}
-                {% endif %}
-                {% if system.model %}
-                  {{ system.model }}
-                {% endif %}
-                {% if system.in_service_contract %}
-                  <span class="badge bg-success ms-1">w umowie</span>
-                {% endif %}
-              </div>
-              <div>
-                <a href="{% url 'core:system_detail' system.pk %}"
-                   class="btn btn-sm btn-outline-primary">
-                  Szczegóły
-                </a>
-              </div>
-            </li>
+          <li class="d-flex justify-content-between align-items-center mb-1">
+            <div>
+              <strong>{{ system.get_system_type_display }}</strong>
+              {% if system.name %}
+              – {{ system.name }}
+              {% endif %}
+              {% if system.manufacturer %}
+              , {{ system.manufacturer }}
+              {% endif %}
+              {% if system.model %}
+              {{ system.model }}
+              {% endif %}
+              {% if system.in_service_contract %}
+              <span class="badge bg-success ms-1">w umowie</span>
+              {% endif %}
+            </div>
+            <div>
+              <a href="{% url 'core:system_detail' system.pk %}" class="btn btn-sm btn-outline-primary">
+                Szczegóły
+              </a>
+            </div>
+          </li>
           {% endfor %}
         </ul>
-      {% else %}
+        {% else %}
         <p class="text-muted small mb-0">Brak przypisanych systemów.</p>
-      {% endif %}
-    {% endwith %}
-  </div>
+        {% endif %}
+        {% endwith %}
       </div>
-
-      <!-- Protokół serwisowy – miejsce pod UX -->
-      {% if order.work_type == order.WorkOrderType.SERVICE %}
-        <div class="card shadow-sm border-0">
-          <div class="card-header bg-white d-flex justify-content-between align-items-center">
-            <h6 class="mb-0">Protokół serwisowy</h6>
-          </div>
-          <div class="card-body small">
-            {% if service_report %}
-              <p class="mb-2">
-                Protokół:
-                {% if service_report.number %}
-                  <strong>{{ service_report.number }}</strong>
-                {% else %}
-                  <span class="text-muted">bez numeru (szkic)</span>
-                {% endif %}
-                {% if service_report.report_date %}
-                  z dnia {{ service_report.report_date|date:"d.m.Y" }}
-                {% endif %}
-              </p>
-            {% else %}
-              <p class="text-muted small mb-2">
-                Brak powiązanego protokołu serwisowego.
-              </p>
-            {% endif %}
-
-            <a href="{% url 'core:service_report_entry' order.pk %}"
-              class="btn btn-sm btn-primary">
-              Otwórz
-            </a>
-
-            <p class="text-muted small mt-2 mb-0">
-              Przycisk otwiera istniejący protokół lub tworzy nowy szkic (bez numeru).
-              Numer PS zostanie nadany po zatwierdzeniu w biurze.
-            </p>
-          </div>
-        </div>
-      {% endif %}
-      {% if maintenance_protocol %}
-      <div class="card mt-3">
-        <div class="card-body">
-          <h5 class="card-title">Protokół konserwacji</h5>
-
-          <p class="mb-1">
-            Okres: {{ maintenance_protocol.period_month|default:"--" }}/{{ maintenance_protocol.period_year|default:"----" }}
-          </p>
-          {% if maintenance_protocol.next_period_month %}
-            <p class="mb-1">
-              Następny przegląd:
-              {{ maintenance_protocol.next_period_month }}/{{ maintenance_protocol.next_period_year }}
-            </p>
-          {% endif %}
-
-          <a href="{% url 'core:maintenance_protocol_detail' maintenance_protocol.pk %}"
-            class="btn btn-sm btn-outline-primary">
-            Podgląd protokołu konserwacji
-          </a>
-        </div>
-      </div>
-    {% endif %}
     </div>
+
+    <!-- Protokół serwisowy – miejsce pod UX -->
+    {% if order.work_type == order.WorkOrderType.SERVICE %}
+    <div class="card shadow-sm border-0">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h6 class="mb-0">Protokół serwisowy</h6>
+      </div>
+      <div class="card-body small">
+        {% if service_report %}
+        <p class="mb-2">
+          Protokół:
+          {% if service_report.number %}
+          <strong>{{ service_report.number }}</strong>
+          {% else %}
+          <span class="text-muted">bez numeru (szkic)</span>
+          {% endif %}
+          {% if service_report.report_date %}
+          z dnia {{ service_report.report_date|date:"d.m.Y" }}
+          {% endif %}
+        </p>
+        {% else %}
+        <p class="text-muted small mb-2">
+          Brak powiązanego protokołu serwisowego.
+        </p>
+        {% endif %}
+
+        <a href="{% url 'core:service_report_entry' order.pk %}" class="btn btn-sm btn-primary">
+          Otwórz
+        </a>
+
+        <p class="text-muted small mt-2 mb-0">
+          Przycisk otwiera istniejący protokół lub tworzy nowy szkic (bez numeru).
+          Numer PS zostanie nadany po zatwierdzeniu w biurze.
+        </p>
+      </div>
+    </div>
+    {% endif %}
+    {% if maintenance_protocol %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Protokół konserwacji</h5>
+
+        <p class="mb-0">
+          <strong>Okres:</strong>
+          {% if maintenance_protocol and maintenance_protocol.contract_period_display %}
+          {{ maintenance_protocol.contract_period_display }}
+          {% else %}
+          ----
+          {% endif %}
+        </p>
+        {% if maintenance_protocol.next_period_month %}
+        <p class="mb-1">
+          <strong>Następny przegląd:</strong>
+          {{ maintenance_protocol.next_period_month }}/{{ maintenance_protocol.next_period_year }}
+        </p>
+        {% endif %}
+
+        <a href="{% url 'core:maintenance_protocol_detail' maintenance_protocol.pk %}"
+          class="btn btn-sm btn-outline-primary">
+          Podgląd protokołu konserwacji
+        </a>
+      </div>
+    </div>
+    {% endif %}
   </div>
+</div>
 {% endblock %}

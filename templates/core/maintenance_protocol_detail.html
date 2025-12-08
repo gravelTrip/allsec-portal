@@ -6,11 +6,29 @@
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h3 class="mb-0">Protokół konserwacji</h3>
 
-    {% if can_edit %}
-    <a href="{% url 'core:maintenance_protocol_edit' protocol.pk %}" class="btn btn-sm btn-primary">
-      Edytuj protokół
-    </a>
-    {% endif %}
+    <div class="d-flex gap-2">
+      <a href="{% url 'core:maintenance_protocol_list' %}" class="btn btn-sm btn-outline-secondary">
+        &larr; Powrót do listy
+      </a>
+
+      <a href="{% url 'core:maintenance_protocol_pdf' protocol.pk %}" class="btn btn-sm btn-outline-secondary">
+        PDF
+      </a>
+
+      {% if can_edit %}
+      <a href="{% url 'core:maintenance_protocol_edit' protocol.pk %}" class="btn btn-sm btn-primary">
+        Edycja
+      </a>
+
+      <form method="post" action="{% url 'core:maintenance_protocol_delete' protocol.pk %}" class="d-inline">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-danger"
+          onclick="return confirm('Na pewno usunąć ten protokół konserwacji?');">
+          Usuń
+        </button>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
   <div class="mb-3">

@@ -1160,3 +1160,54 @@ def maintenance_protocol_detail(request, pk):
         # "can_edit": is_office(request.user),  # jeśli chcesz od razu tylko biuro
     }
     return render(request, "core/maintenance_protocol_detail.html", context)
+
+
+@xframe_options_sameorigin
+@login_required
+def maintenance_protocol_pdf(request, pk):
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("site", "work_order"),
+        pk=pk,
+    )
+
+    sections = protocol.sections.all().prefetch_related("check_items")
+
+    base_name = protocol.number or f"KS_{protocol.pk}"
+    safe_name = base_name.replace("/", "_").replace("\\", "_")
+
+    context = {
+        "protocol": protocol,
+        "site": protocol.site,
+        "work_order": protocol.work_order,
+        "sections": sections,
+        "download_filename": safe_name,
+    }
+    return render(request, "core/maintenance_protocol_pdf.html", context)
+
+
+@login_required
+def maintenance_protocol_delete(request, pk):
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("site", "work_order"),
+        pk=pk,
+    )
+
+    if not is_office(request.user):
+        return HttpResponseForbidden(
+            "Brak uprawnień do usuwania protokołów konserwacji."
+        )
+
+    work_order_pk = protocol.work_order.pk if protocol.work_order_id else None
+
+    if request.method == "POST":
+        protocol.delete()
+
+        # Po usunięciu: jeśli był powiązany ze zleceniem -> wróć do zlecenia,
+        # w przeciwnym razie -> lista protokołów KS
+        if work_order_pk:
+            return redirect("core:workorder_detail", pk=work_order_pk)
+        return redirect("core:maintenance_protocol_list")
+
+    # GET -> wróć na szczegóły
+    return redirect("core:maintenance_protocol_detail", pk=pk)
+

@@ -131,6 +131,16 @@ urlpatterns = [
         views.maintenance_protocol_edit,
         name="maintenance_protocol_edit",
     ),
+    path(
+        "protokoły-konserwacji/<int:pk>/pdf/",
+        views.maintenance_protocol_pdf,
+        name="maintenance_protocol_pdf",
+    ),
+    path(
+        "protokoły-konserwacji/<int:pk>/usun/",
+        views.maintenance_protocol_delete,
+        name="maintenance_protocol_delete",
+    ),
 
     path(
         "protokoly-przegladow/",
