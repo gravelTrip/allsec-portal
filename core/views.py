@@ -1,7 +1,9 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.utils import timezone
+from datetime import date, timedelta
 from django.http import HttpResponseForbidden, JsonResponse
 from django.db.models import Sum
 
@@ -97,23 +99,258 @@ def dashboard(request):
         # gdyby Job.Status jeszcze nie miał COMPLETED, pokaż po prostu liczbę robót
         jobs_in_progress = Job.objects.count()
 
-    # ZLECENIA NA DZIŚ – posortowane po dacie i dacie utworzenia (bez priority)
-    today_orders = (
-        base_qs.filter(planned_date=today)
-        .order_by("planned_date", "created_at")
-        .select_related("site")
+    # --- FILTRY LISTY "Zlecenia" ---
+
+    orders = base_qs.select_related("site", "assigned_to")
+
+    # Typ zlecenia
+    type_param = request.GET.get("type", "").strip()
+    valid_work_types = {choice[0] for choice in WorkOrder.WorkOrderType.choices}
+    if type_param and type_param in valid_work_types:
+        orders = orders.filter(work_type=type_param)
+
+    # Serwisant
+    assignee_param = request.GET.get("assignee", "").strip()
+    if assignee_param:
+        try:
+            assignee_id = int(assignee_param)
+            orders = orders.filter(assigned_to_id=assignee_id)
+        except (TypeError, ValueError):
+            pass
+
+    # Status
+    status_param = request.GET.get("status", "").strip()
+    valid_statuses = {choice[0] for choice in WorkOrder.Status.choices}
+    if status_param and status_param in valid_statuses:
+        orders = orders.filter(status=status_param)
+
+    # Czas
+    time_param = request.GET.get("time", "week").strip()  # domyślnie tydzień
+    date_from_str = request.GET.get("date_from", "").strip()
+    date_to_str = request.GET.get("date_to", "").strip()
+
+    if time_param == "week":
+        # poniedziałek–niedziela bieżącego tygodnia
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        orders = orders.filter(planned_date__range=(start_of_week, end_of_week))
+    elif time_param == "month":
+        orders = orders.filter(
+            planned_date__year=today.year,
+            planned_date__month=today.month,
+        )
+    elif time_param == "year":
+        orders = orders.filter(planned_date__year=today.year)
+    elif time_param == "range":
+        try:
+            if date_from_str:
+                df = date.fromisoformat(date_from_str)
+            else:
+                df = None
+            if date_to_str:
+                dt = date.fromisoformat(date_to_str)
+            else:
+                dt = None
+            if df and dt:
+                orders = orders.filter(planned_date__range=(df, dt))
+            elif df:
+                orders = orders.filter(planned_date__gte=df)
+            elif dt:
+                orders = orders.filter(planned_date__lte=dt)
+        except ValueError:
+            # jak coś nie tak z datą, ignorujemy filtr zakresu
+            pass
+    # "all" → bez filtra daty
+
+    # Checkbox "Ukryj zakończone" (domyślnie tak)
+    hide_completed_param = request.GET.get("hide_completed", "1")
+    hide_completed = hide_completed_param in ("1", "true", "on", "yes")
+    if hide_completed:
+        orders = orders.exclude(status=WorkOrder.Status.COMPLETED)
+
+    # Sortowanie – na koniec po dacie i dacie utworzenia
+    orders = orders.order_by("planned_date", "created_at")
+
+    # Dane do dropdownów filtrów
+    User = get_user_model()
+    assignee_qs = (
+        User.objects.filter(assigned_work_orders__isnull=False)
+        .distinct()
+        .order_by("first_name", "last_name", "username")
     )
+
+    # Listy opcji z informacją, który element jest zaznaczony
+    type_choices = [
+        {
+            "value": value,
+            "label": label,
+            "selected": (value == type_param),
+        }
+        for value, label in WorkOrder.WorkOrderType.choices
+    ]
+
+    status_choices = [
+        {
+            "value": value,
+            "label": label,
+            "selected": (value == status_param),
+        }
+        for value, label in WorkOrder.Status.choices
+    ]
+
+    time_raw_choices = [
+        ("all", "Wszystko"),
+        ("week", "Tydzień"),
+        ("month", "Miesiąc"),
+        ("year", "Rok"),
+        ("range", "Zakres"),
+    ]
+    time_choices = [
+        {
+            "value": value,
+            "label": label,
+            "selected": (value == time_param),
+        }
+        for value, label in time_raw_choices
+    ]
+
+    assignee_choices = [
+        {
+            "id": u.id,
+            "label": u.get_full_name() or u.username,
+            "selected": (str(u.id) == assignee_param),
+        }
+        for u in assignee_qs
+    ]
+
+
+
+    # --- MODUŁ "Konserwacje na:" ---
+
+    def add_months(year: int, month: int, delta: int):
+        """
+        Przesunięcie (rok, miesiąc) o delta miesięcy (może być ujemne).
+        """
+        total = year * 12 + (month - 1) + delta
+        new_year = total // 12
+        new_month = (total % 12) + 1
+        return new_year, new_month
+
+    try:
+        month_offset = int(request.GET.get("km", "0"))
+    except ValueError:
+        month_offset = 0
+    # zakres -1..3 jak ustaliliśmy
+    month_offset = max(-1, min(3, month_offset))
+
+    base_year, base_month = today.year, today.month
+    selected_year, selected_month = add_months(base_year, base_month, month_offset)
+
+    # Lista miesięcy: -1..3 względem bieżącego
+    month_choices = []
+    for delta in range(-1, 4):  # -1, 0, 1, 2, 3
+        y, m = add_months(base_year, base_month, delta)
+        month_choices.append(
+            {
+                "label": f"{m:02d}/{y}",
+                "value": delta,
+                "is_current": delta == month_offset,
+            }
+        )
+
+    # Obiekty z konserwacjami wg ustawień obiektu
+    sites_qs = Site.objects.exclude(
+        maintenance_frequency=Site.MaintenanceFrequency.NONE
+    ).select_related("entity")
+
+    maintenance_items = []
+
+    for site in sites_qs:
+        # Miesiące wykonania konserwacji:
+        # - preferujemy execution_months (jeśli używasz), fallback do maintenance_months
+        exec_months = []
+        try:
+            if site.execution_months:
+                exec_months = [int(x) for x in site.execution_months]
+        except (TypeError, ValueError):
+            exec_months = []
+
+        if not exec_months:
+            exec_months = site.maintenance_months
+
+        if selected_month not in exec_months:
+            continue
+
+        # Zlecenia konserwacji na ten okres
+        period_orders = WorkOrder.objects.filter(
+            site=site,
+            work_type=WorkOrder.WorkOrderType.MAINTENANCE,
+            planned_date__year=selected_year,
+            planned_date__month=selected_month,
+        )
+
+        # Jeśli jest zlecenie ZAKOŃCZONE → obiekt znika z listy
+        if period_orders.filter(status=WorkOrder.Status.COMPLETED).exists():
+            continue
+
+        # Jeśli jest zlecenie w innym statusie → pokażemy "W trakcie"
+        ongoing_order = (
+            period_orders.exclude(status=WorkOrder.Status.COMPLETED)
+            .order_by("planned_date", "created_at")
+            .first()
+        )
+
+        maintenance_items.append(
+            {
+                "site": site,
+                "ongoing_order": ongoing_order,  # None → pokaż "Utwórz"
+            }
+        )
+
+    # Sortowanie: entity.name, site.name
+    maintenance_items.sort(
+        key=lambda item: (
+            item["site"].entity.name if item["site"].entity_id else "",
+            item["site"].name,
+        )
+    )
+
+    maintenance_module = {
+        "selected_year": selected_year,
+        "selected_month": selected_month,
+        "selected_label": f"{selected_month:02d}/{selected_year}",
+        "selected_period_param": f"{selected_year}-{selected_month:02d}",  # np. 2025-12
+        "month_offset": month_offset,
+        "month_choices": month_choices,
+        "items": maintenance_items,
+    }
+
 
     context = {
         "stats": {
             "open_orders": open_orders,
-            "critical_orders": critical_orders,          # teraz: czekające na decyzję / materiał
+            "critical_orders": critical_orders,
             "overdue_maintenance": overdue_maintenance,
             "jobs_in_progress": jobs_in_progress,
         },
-        "today_orders": today_orders,
+        "today_orders": orders,  # to już jest przefiltrowana lista "Zleceń"
+        "maintenance_module": maintenance_module,
+        "order_filters": {
+            "type": type_param,
+            "status": status_param,
+            "assignee": assignee_param,
+            "time": time_param,
+            "date_from": date_from_str,
+            "date_to": date_to_str,
+            "hide_completed": hide_completed,
+            "type_choices": type_choices,
+            "status_choices": status_choices,
+            "assignee_choices": assignee_choices,
+            "time_choices": time_choices,
+        },
     }
     return render(request, "core/dashboard.html", context)
+
 
 
 @login_required
@@ -303,7 +540,35 @@ def workorder_create(request):
 
             return redirect("core:workorder_detail", pk=order.pk)
     else:
-        form = WorkOrderForm()
+        # Inicjalizacja z parametrów GET (np. z modułu "Konserwacje na:")
+        initial = {}
+
+        # site=<id>
+        site_id = request.GET.get("site")
+        if site_id:
+            try:
+                initial["site"] = Site.objects.get(pk=site_id)
+            except Site.DoesNotExist:
+                pass
+
+        # work_type=MAINTENANCE / SERVICE / JOB / OTHER
+        work_type_param = request.GET.get("work_type")
+        valid_work_types = {choice[0] for choice in WorkOrder.WorkOrderType.choices}
+        if work_type_param in valid_work_types:
+            initial["work_type"] = work_type_param
+
+        # period=RRRR-MM – ustawiamy planned_date na 1. dzień tego miesiąca
+        period_param = request.GET.get("period")
+        if period_param:
+            try:
+                year_str, month_str = period_param.split("-")
+                year = int(year_str)
+                month = int(month_str)
+                initial["planned_date"] = date(year, month, 1)
+            except (ValueError, TypeError):
+                pass
+
+        form = WorkOrderForm(initial=initial)
 
     context = {
         "form": form,

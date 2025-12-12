@@ -213,3 +213,11 @@ main h1.h3 {
     color: #ffffff;
     text-decoration: none;
 }
+
+#dashboard-orders-body tr {
+    cursor: move;
+}
+
+#dashboard-maintenance-list li {
+    cursor: move;
+}
