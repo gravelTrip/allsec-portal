@@ -162,9 +162,18 @@ def dashboard(request):
             pass
     # "all" → bez filtra daty
 
-    # Checkbox "Ukryj zakończone" (domyślnie tak)
-    hide_completed_param = request.GET.get("hide_completed", "1")
-    hide_completed = hide_completed_param in ("1", "true", "on", "yes")
+    # Checkbox "Ukryj zakończone":
+    # - jeśli NIE ma żadnych filtrów w URL -> domyślnie ukrywamy zakończone
+    # - jeśli są jakieś filtry -> respektujemy parametr hide_completed (obecny/nieobecny)
+    filter_keys = ["type", "assignee", "status", "time", "date_from", "date_to", "hide_completed"]
+    has_filter_params = any(key in request.GET for key in filter_keys)
+
+    if has_filter_params:
+        hide_completed_param = request.GET.get("hide_completed", "")
+        hide_completed = hide_completed_param in ("1", "true", "on", "yes")
+    else:
+        hide_completed = True
+
     if hide_completed:
         orders = orders.exclude(status=WorkOrder.Status.COMPLETED)
 

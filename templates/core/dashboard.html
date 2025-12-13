@@ -162,9 +162,11 @@
                 </label>
               </div>
               <div>
-                <button type="submit" class="btn btn-sm btn-primary">
-                  Filtruj
-                </button>
+                <div>
+                  <button type="button" id="dashboard-filters-reset" class="btn btn-sm btn-outline-secondary">
+                    Resetuj
+                  </button>
+                </div>
               </div>
             </div>
           </form>
@@ -255,6 +257,17 @@
             Konserwacje na:
           </h6>
           <form method="get" class="mb-0">
+            {# Zachowaj aktualne filtry zleceń przy zmianie miesiąca #}
+            <input type="hidden" name="type" value="{{ order_filters.type }}">
+            <input type="hidden" name="assignee" value="{{ order_filters.assignee }}">
+            <input type="hidden" name="status" value="{{ order_filters.status }}">
+            <input type="hidden" name="time" value="{{ order_filters.time }}">
+            <input type="hidden" name="date_from" value="{{ order_filters.date_from }}">
+            <input type="hidden" name="date_to" value="{{ order_filters.date_to }}">
+            {% if order_filters.hide_completed %}
+            <input type="hidden" name="hide_completed" value="1">
+            {% endif %}
+
             <select name="km" class="form-select form-select-sm" onchange="this.form.submit()">
               {% for m in maintenance_module.month_choices %}
               <option value="{{ m.value }}" {% if m.is_current %} selected{% endif %}>

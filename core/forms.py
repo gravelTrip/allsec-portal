@@ -49,10 +49,11 @@ class WorkOrderForm(forms.ModelForm):
             "title": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
 
             "planned_date": forms.DateInput(
+                format="%Y-%m-%d",
                 attrs={
                     "type": "date",
                     "class": "form-control form-control-sm",
-                }
+                },
             ),
 
             "visit_type": forms.Select(
@@ -221,10 +222,11 @@ class ServiceReportForm(forms.ModelForm):
         ]
         widgets = {
             "report_date": forms.DateInput(
+                format="%Y-%m-%d",
                 attrs={
                     "type": "date",
                     "class": "form-control form-control-sm",
-                }
+                },
             ),
             "service_mode": forms.Select(
                 attrs={
@@ -291,11 +293,13 @@ class MaintenanceProtocolForm(forms.ModelForm):
         ]
         widgets = {
             "date": forms.DateInput(
+                format="%Y-%m-%d",
                 attrs={
                     "type": "date",
                     "class": "form-control form-control-sm",
-                }
+                },
             ),
+
             "next_period_year": forms.NumberInput(
                 attrs={
                     "class": "form-control form-control-sm",

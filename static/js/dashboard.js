@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const userId = root.dataset.userId || "anon";
 
-  // --- Helpery localStorage ---
+  // --- Helpery localStorage dla kolejek drag&drop ---
 
   function saveOrder(container, storageKey, itemSelector) {
     if (!container) return;
@@ -62,7 +62,6 @@ document.addEventListener("DOMContentLoaded", function () {
   if (ordersBody) {
     const ordersStorageKey = `allsec_dashboard_orders_${userId}`;
 
-    // Przy pierwszym wejściu spróbuj odtworzyć kolejność
     applyOrder(ordersBody, ordersStorageKey, "tr[data-id]");
 
     if (window.Sortable && typeof window.Sortable.create === "function") {
@@ -117,17 +116,141 @@ document.addEventListener("DOMContentLoaded", function () {
     timeSelect.addEventListener("change", updateDateRangeVisibility);
   }
 
-  // --- Auto-submit filtrów po zmianie ---
+  // --- Filtry zleceń: pamiętanie ustawień + auto-submit + reset ---
 
   const filtersForm = document.getElementById("dashboard-orders-filters");
+
+  function hasQueryFilters() {
+    const params = new URLSearchParams(window.location.search);
+    const filterNames = [
+      "type",
+      "assignee",
+      "status",
+      "time",
+      "date_from",
+      "date_to",
+      "hide_completed",
+    ];
+    return filterNames.some((name) => params.has(name));
+  }
+
   if (filtersForm) {
+    const filtersStorageKey = `allsec_dashboard_filters_${userId}`;
+
+    function saveFiltersToStorage() {
+      const data = {};
+      const typeField = filtersForm.querySelector("select[name='type']");
+      const assigneeField = filtersForm.querySelector("select[name='assignee']");
+      const statusField = filtersForm.querySelector("select[name='status']");
+      const timeField = filtersForm.querySelector("select[name='time']");
+      const dateFromField = filtersForm.querySelector("input[name='date_from']");
+      const dateToField = filtersForm.querySelector("input[name='date_to']");
+      const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+
+      data.type = typeField ? typeField.value || "" : "";
+      data.assignee = assigneeField ? assigneeField.value || "" : "";
+      data.status = statusField ? statusField.value || "" : "";
+      data.time = timeField ? timeField.value || "" : "";
+      data.date_from = dateFromField ? dateFromField.value || "" : "";
+      data.date_to = dateToField ? dateToField.value || "" : "";
+      data.hide_completed = hideCheckbox ? !!hideCheckbox.checked : true;
+
+      try {
+        window.localStorage.setItem(filtersStorageKey, JSON.stringify(data));
+      } catch (e) {
+        // brak localStorage – ignorujemy
+      }
+    }
+
+    function loadFiltersFromStorage() {
+      let stored = null;
+      try {
+        stored = window.localStorage.getItem(filtersStorageKey);
+      } catch (e) {
+        stored = null;
+      }
+      if (!stored) return false;
+
+      let data;
+      try {
+        data = JSON.parse(stored);
+      } catch (e) {
+        return false;
+      }
+      if (!data || typeof data !== "object") return false;
+
+      const typeField = filtersForm.querySelector("select[name='type']");
+      const assigneeField = filtersForm.querySelector("select[name='assignee']");
+      const statusField = filtersForm.querySelector("select[name='status']");
+      const timeField = filtersForm.querySelector("select[name='time']");
+      const dateFromField = filtersForm.querySelector("input[name='date_from']");
+      const dateToField = filtersForm.querySelector("input[name='date_to']");
+      const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+
+      if (typeField && "type" in data) typeField.value = data.type || "";
+      if (assigneeField && "assignee" in data)
+        assigneeField.value = data.assignee || "";
+      if (statusField && "status" in data) statusField.value = data.status || "";
+      if (timeField && "time" in data) timeField.value = data.time || "";
+      if (dateFromField && "date_from" in data)
+        dateFromField.value = data.date_from || "";
+      if (dateToField && "date_to" in data)
+        dateToField.value = data.date_to || "";
+      if (hideCheckbox && "hide_completed" in data)
+        hideCheckbox.checked = !!data.hide_completed;
+
+      return true;
+    }
+
+    // Jeśli nie ma żadnych filtrów w URL, spróbuj wczytać z localStorage
+    if (!hasQueryFilters()) {
+      const loaded = loadFiltersFromStorage();
+      if (loaded) {
+        updateDateRangeVisibility();
+        filtersForm.submit();
+        return; // reszta JS wykona się po przeładowaniu strony
+      }
+    }
+
+    // Auto-submit + zapisywanie filtrów po każdej zmianie
     const autoSubmitInputs = filtersForm.querySelectorAll(
       "select, input[type='checkbox'], input[type='date']"
     );
     autoSubmitInputs.forEach((el) => {
       el.addEventListener("change", function () {
+        saveFiltersToStorage();
         filtersForm.submit();
       });
     });
+
+    // Przycisk "Resetuj" – przywrócenie domyślnych wartości
+    const resetButton = document.getElementById("dashboard-filters-reset");
+    if (resetButton) {
+      resetButton.addEventListener("click", function () {
+        const typeField = filtersForm.querySelector("select[name='type']");
+        const assigneeField = filtersForm.querySelector("select[name='assignee']");
+        const statusField = filtersForm.querySelector("select[name='status']");
+        const timeField = filtersForm.querySelector("select[name='time']");
+        const dateFromField = filtersForm.querySelector("input[name='date_from']");
+        const dateToField = filtersForm.querySelector("input[name='date_to']");
+        const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+
+        if (typeField) typeField.value = "";
+        if (assigneeField) assigneeField.value = "";
+        if (statusField) statusField.value = "";
+        if (timeField) timeField.value = "week";
+        if (dateFromField) dateFromField.value = "";
+        if (dateToField) dateToField.value = "";
+        if (hideCheckbox) hideCheckbox.checked = true;
+
+        try {
+          window.localStorage.removeItem(filtersStorageKey);
+        } catch (e) {}
+
+        updateDateRangeVisibility();
+
+        filtersForm.submit();
+      });
+    }
   }
 });
