@@ -7,7 +7,12 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+
     path("pwa/", views_pwa.pwa_home, name="pwa_home"),
+    path("api/pwa/catalog/dump/", views_pwa.api_pwa_catalog_dump, name="api_pwa_catalog_dump"),
+    path("pwa/obiekty/", views_pwa.pwa_objects, name="pwa_objects"),
+
+
     path("zlecenia/", views.workorder_list, name="workorder_list"),
     path("zlecenia/nowe/", views.workorder_create, name="workorder_create"),
     path("zlecenia/<int:pk>/", views.workorder_detail, name="workorder_detail"),

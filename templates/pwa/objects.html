@@ -1,0 +1,38 @@
+{% extends "pwa/base_pwa.html" %}
+
+{% block title %}PWA – Obiekty{% endblock %}
+
+{% block content %}
+<div class="pwa-topbar bg-white border-bottom">
+    <div class="container-fluid py-2">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <a class="btn btn-outline-secondary pwa-btn" href="{% url 'core:pwa_home' %}">←</a>
+
+            <div class="small text-center flex-grow-1">
+                <div class="fw-semibold">Ostatnia synchronizacja: <span id="lastSync">—</span></div>
+                <div class="pwa-muted">
+                    Status: <span id="netDot">🟢</span> <span id="netText">online</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-dark pwa-btn" id="syncBtn">SYNC</button>
+        </div>
+
+        <div class="mt-2">
+            <input id="searchBox" class="form-control form-control-lg"
+                placeholder="Szukaj obiektu (nazwa / ulica / miasto)…">
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid py-3">
+    <div id="viewRoot"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module">
+    import { initPwaObjects } from "/static/pwa/objects.js";
+    initPwaObjects();
+</script>
+{% endblock %}

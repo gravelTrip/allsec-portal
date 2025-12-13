@@ -19,11 +19,10 @@
         </div>
 
         <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-primary w-50 pwa-btn" type="button">ZLECENIA</button>
-            <button class="btn btn-outline-primary w-50 pwa-btn" type="button" disabled
-                title="W kroku 1A jeszcze nieaktywne">
-                OBIEKTY
-            </button>
+            <a class="btn btn-primary w-50 pwa-btn" href="{% url 'core:pwa_home' %}">ZLECENIA</a>
+
+            <a class="btn btn-outline-primary w-50 pwa-btn" href="{% url 'core:pwa_objects' %}">OBIEKTY</a>
+
         </div>
     </div>
 </div>
@@ -65,30 +64,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    function updateOnlineUI() {
-        const online = navigator.onLine;
-        document.getElementById("netDot").textContent = online ? "🟢" : "🔴";
-        document.getElementById("netText").textContent = online ? "online" : "offline";
-    }
-
-    function loadLastSync() {
-        const v = localStorage.getItem("pwa_last_sync");
-        document.getElementById("lastSync").textContent = v || "—";
-    }
-
-    document.getElementById("syncBtn").addEventListener("click", () => {
-        // Krok 1A: jeszcze bez prawdziwego sync. Na razie tylko “odświeżenie czasu”.
-        const now = new Date();
-        const stamp = now.toLocaleString("pl-PL");
-        localStorage.setItem("pwa_last_sync", stamp);
-        loadLastSync();
-    });
-
-    window.addEventListener("online", updateOnlineUI);
-    window.addEventListener("offline", updateOnlineUI);
-
-    updateOnlineUI();
-    loadLastSync();
+<script type="module">
+    import { initPwaHome } from "/static/pwa/pwa.js";
+    initPwaHome();
 </script>
 {% endblock %}
