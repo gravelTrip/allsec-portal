@@ -1,0 +1,94 @@
+{% extends "pwa/base_pwa.html" %}
+
+{% block title %}PWA – Zlecenia{% endblock %}
+
+{% block content %}
+<div class="pwa-topbar bg-white border-bottom">
+    <div class="container-fluid py-2">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="small">
+                <div class="fw-semibold">Ostatnia synchronizacja: <span id="lastSync">—</span></div>
+                <div class="pwa-muted">
+                    Status: <span id="netDot">🟢</span> <span id="netText">online</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-dark pwa-btn" id="syncBtn">
+                SYNC
+            </button>
+        </div>
+
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-primary w-50 pwa-btn" type="button">ZLECENIA</button>
+            <button class="btn btn-outline-primary w-50 pwa-btn" type="button" disabled
+                title="W kroku 1A jeszcze nieaktywne">
+                OBIEKTY
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid py-3">
+    <h5 class="mb-3">Zlecenia na dziś ({{ today|date:"d.m.Y" }})</h5>
+
+    {% if workorders_today %}
+    <div class="d-grid gap-2">
+        {% for wo in workorders_today %}
+        <a class="card pwa-card text-decoration-none text-dark" href="{% url 'core:workorder_detail' wo.pk %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <div>
+                        <div class="fw-semibold">#{{ wo.pk }} — {{ wo.title }}</div>
+                        <div class="small pwa-muted">
+                            {% if wo.site %}{{ wo.site.name }}{% else %}Brak obiektu{% endif %}
+                        </div>
+                    </div>
+                    <div class="small text-end pwa-muted">
+                        {% if wo.planned_time_from %}{{ wo.planned_time_from|time:"H:i" }}{% endif %}
+                        {% if wo.planned_time_to %}– {{ wo.planned_time_to|time:"H:i" }}{% endif %}
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <span class="badge text-bg-secondary">{{ wo.get_status_display }}</span>
+                    <span class="badge text-bg-info">{{ wo.get_work_type_display }}</span>
+                </div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light border">
+        Brak zleceń przypisanych na dziś.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function updateOnlineUI() {
+        const online = navigator.onLine;
+        document.getElementById("netDot").textContent = online ? "🟢" : "🔴";
+        document.getElementById("netText").textContent = online ? "online" : "offline";
+    }
+
+    function loadLastSync() {
+        const v = localStorage.getItem("pwa_last_sync");
+        document.getElementById("lastSync").textContent = v || "—";
+    }
+
+    document.getElementById("syncBtn").addEventListener("click", () => {
+        // Krok 1A: jeszcze bez prawdziwego sync. Na razie tylko “odświeżenie czasu”.
+        const now = new Date();
+        const stamp = now.toLocaleString("pl-PL");
+        localStorage.setItem("pwa_last_sync", stamp);
+        loadLastSync();
+    });
+
+    window.addEventListener("online", updateOnlineUI);
+    window.addEventListener("offline", updateOnlineUI);
+
+    updateOnlineUI();
+    loadLastSync();
+</script>
+{% endblock %}

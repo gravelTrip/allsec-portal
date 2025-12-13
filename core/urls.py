@@ -1,10 +1,13 @@
 from django.urls import path
 from . import views
+from . import views_pwa
+
 
 app_name = "core"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
+    path("pwa/", views_pwa.pwa_home, name="pwa_home"),
     path("zlecenia/", views.workorder_list, name="workorder_list"),
     path("zlecenia/nowe/", views.workorder_create, name="workorder_create"),
     path("zlecenia/<int:pk>/", views.workorder_detail, name="workorder_detail"),
