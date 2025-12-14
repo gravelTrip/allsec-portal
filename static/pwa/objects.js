@@ -1,4 +1,4 @@
-import { getAll, getByKey, getAllByIndex, getMeta } from "./idb.js";
+import { getAll, getByKey, getAllByIndex } from "./idb.js";
 
 function esc(s) {
   return String(s ?? "")
@@ -25,68 +25,6 @@ function setQuerySiteId(siteId) {
   history.pushState({}, "", url);
 }
 
-function updateOnlineUI() {
-  const online = navigator.onLine;
-  const dot = document.getElementById("netDot");
-  const txt = document.getElementById("netText");
-  if (dot) dot.textContent = online ? "🟢" : "🔴";
-  if (txt) txt.textContent = online ? "online" : "offline";
-}
-
-async function loadLastSync() {
-  const v = await getMeta("last_sync");
-  const el = document.getElementById("lastSync");
-  if (el) el.textContent = v || "—";
-}
-
-function setBusy(isBusy) {
-  const btn = document.getElementById("syncBtn");
-  if (!btn) return;
-  btn.disabled = isBusy;
-  btn.textContent = isBusy ? "SYNC…" : "SYNC";
-}
-
-async function doSyncCatalog() {
-  if (!navigator.onLine) {
-    alert("Brak internetu — nie mogę zsynchronizować teraz.");
-    return;
-  }
-
-  setBusy(true);
-  try {
-    // używamy tej samej logiki co na stronie /pwa/ (pwa.js)
-    const mod = await import("./pwa.js");
-    // pwa.js ma prywatne doSyncCatalog, więc tutaj robimy prosto:
-    const resp = await fetch("/api/pwa/catalog/dump/", {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-
-    // zapis jak w pwa.js (snapshot)
-    const { clearStore, putMany, setMeta } = await import("./idb.js");
-    await clearStore("sites");
-    await clearStore("systems");
-    await putMany("sites", data.sites || []);
-    await putMany("systems", data.systems || []);
-
-    const stamp = new Date().toLocaleString("pl-PL");
-    await setMeta("last_sync", stamp);
-    await loadLastSync();
-
-    alert(`SYNC OK ✅\nObiekty: ${data.sites?.length || 0}\nSystemy: ${data.systems?.length || 0}`);
-    // po sync odśwież widok
-    await render();
-  } catch (e) {
-    console.error(e);
-    alert("SYNC nieudany ❌\n" + (e?.message || e));
-  } finally {
-    setBusy(false);
-  }
-}
 
 async function renderList() {
   const root = document.getElementById("viewRoot");
@@ -254,22 +192,14 @@ async function render() {
 }
 
 export async function initPwaObjects() {
-  updateOnlineUI();
-  await loadLastSync();
   await render();
 
-  window.addEventListener("online", updateOnlineUI);
-  window.addEventListener("offline", updateOnlineUI);
   window.addEventListener("popstate", render);
 
   const searchBox = document.getElementById("searchBox");
   if (searchBox) {
     searchBox.addEventListener("input", () => {
-      // tylko lista reaguje na wyszukiwanie
       if (!qs().get("site")) render();
     });
   }
-
-  const syncBtn = document.getElementById("syncBtn");
-  if (syncBtn) syncBtn.addEventListener("click", doSyncCatalog);
 }

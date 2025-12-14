@@ -5,10 +5,31 @@ function $(id) {
   return document.getElementById(id);
 }
 
-function updateOnlineUI() {
-  const online = navigator.onLine;
-  if ($("netDot")) $("netDot").textContent = online ? "🟢" : "🔴";
-  if ($("netText")) $("netText").textContent = online ? "online" : "offline";
+async function pingServer(timeoutMs = 1500) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  try {
+    const resp = await fetch("/api/pwa/ping/", {
+      method: "GET",
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: ctrl.signal,
+    });
+    return resp.ok;
+  } catch (e) {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+async function updateOnlineUI() {
+  const ok = await pingServer();
+
+  if ($("netDot")) $("netDot").textContent = ok ? "🟢" : "🔴";
+  if ($("netText")) $("netText").textContent = ok ? "online" : "offline";
 }
 
 async function loadLastSync() {
@@ -65,12 +86,12 @@ export function initPwaHome() {
   updateOnlineUI();
   loadLastSync();
 
-  window.addEventListener("online", updateOnlineUI);
-  window.addEventListener("offline", updateOnlineUI);
-
   const btn = $("syncBtn");
   if (btn) btn.addEventListener("click", doSyncCatalog);
 
-  // bezpiecznik (czasem eventy online/offline w DevTools bywają kapryśne)
-  setInterval(updateOnlineUI, 1000);
+  // ping co 10s + po powrocie na kartę
+  setInterval(updateOnlineUI, 10000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) updateOnlineUI();
+  });
 }

@@ -5,11 +5,12 @@ from django.shortcuts import render
 
 from .models import WorkOrder
 
-from django.http import JsonResponse, HttpRequest
+from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
 from .models import Site, System
+
 
 
 @login_required
@@ -81,3 +82,70 @@ def api_pwa_catalog_dump(request: HttpRequest) -> JsonResponse:
 @login_required
 def pwa_objects(request):
     return render(request, "pwa/objects.html")
+
+
+
+@require_GET
+def pwa_sw(request):
+    js = r"""
+const CACHE_NAME = "allsec-pwa-shell-v3";
+const SHELL_URLS = [
+  "/pwa/",
+  "/pwa/obiekty/",
+  "/static/css/main.css",
+  "/static/pwa/pwa.js",
+  "/static/pwa/idb.js",
+  "/static/pwa/objects.js",
+];
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)));
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.map((k) => (k === CACHE_NAME ? null : caches.delete(k)))))
+  );
+  self.clients.claim();
+});
+
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+
+  if (url.origin !== self.location.origin) return;
+  if (req.method !== "GET") return;
+  if (url.pathname.startsWith("/api/")) return; // dane są w IndexedDB
+
+  // NAWIGACJA (HTML) -> offline fallback na /pwa/
+  if (req.mode === "navigate") {
+    event.respondWith(
+      fetch(req).catch(async () => {
+        const cached = await caches.match(url.pathname, { ignoreSearch: true });
+        return cached || caches.match("/pwa/", { ignoreSearch: true });
+      })
+    );
+    return;
+  }
+
+  // STATYKI / PWA -> cache-first
+  event.respondWith(
+    caches.match(req, { ignoreSearch: true }).then((cached) => {
+      if (cached) return cached;
+      return fetch(req).then((resp) => {
+        if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/pwa/")) {
+          caches.open(CACHE_NAME).then((cache) => cache.put(req, resp.clone()));
+        }
+        return resp;
+      });
+    })
+  );
+});
+"""
+    return HttpResponse(js, content_type="application/javascript")
+
+@require_GET
+@login_required
+def api_pwa_ping(request):
+    return JsonResponse({"ok": True, "server_time": timezone.now().isoformat()})
