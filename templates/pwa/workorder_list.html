@@ -18,9 +18,14 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div>
-                        <div class="fw-semibold">#{{ wo.pk }} — {{ wo.title }}</div>
+                        <div class="fw-semibold">{{ wo.title }}</div>
                         <div class="small pwa-muted">
-                            {% if wo.site %}{{ wo.site.name }}{% else %}Brak obiektu{% endif %}
+                            {% if wo.site %}
+                            {{ wo.site.name }}{% if wo.site.street or wo.site.city %} - {{ wo.site.street }}
+                            {% if wo.site.city %} {{ wo.site.city }}{% endif %}{% endif %}
+                            {% else %}
+                            Brak obiektu
+                            {% endif %}
                         </div>
                         <div class="small pwa-muted">
                             {% if wo.planned_date %}{{ wo.planned_date|date:"d.m.Y" }}{% else %}Brak terminu{% endif %}
@@ -35,6 +40,13 @@
                 <div class="mt-2">
                     <span class="badge text-bg-secondary">{{ wo.get_status_display }}</span>
                     <span class="badge text-bg-info">{{ wo.get_work_type_display }}</span>
+                    {% for lbl in wo.pwa_system_badges %}
+                    <span class="badge text-bg-light border text-dark">{{ lbl }}</span>
+                    {% endfor %}
+                    {% if wo.pwa_system_badges_more %}
+                    <span class="badge text-bg-light border text-dark">+{{ wo.pwa_system_badges_more }}</span>
+                    {% endif %}
+
                 </div>
             </div>
         </a>

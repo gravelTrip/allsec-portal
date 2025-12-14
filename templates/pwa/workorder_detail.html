@@ -3,175 +3,188 @@
 {% block title %}PWA – Zlecenie{% endblock %}
 
 {% block content %}
-<div class="pwa-topbar bg-white border-bottom">
+<<div class="pwa-topbar bg-white border-bottom">
     <div class="container-fluid py-2">
-        <div class="d-flex align-items-center gap-2">
-            <div class="pwa-topbar bg-white border-bottom">
-                <div class="container-fluid py-2">
-                    {% url 'core:pwa_workorder_list' as back_url %}
-                    {% include "pwa/_topbar_back.html" with title="Zlecenie" back_url=back_url %}
+        <div class="d-flex align-items-center">
+            <button type="button" class="btn btn-primary pwa-btn" data-pwa-back
+                data-fallback="{% url 'core:pwa_workorder_list' %}">
+                ← Powrót
+            </button>
+
+            <div style="margin-left: 1cm;" class="small text-truncate">
+                <div class="fw-semibold">
+                    Zlecenie {{ wo.get_work_type_display }}
+                    {{ wo.number|default:"" }}
+                    z {{ wo.planned_date|date:"d.m.Y"|default:"—" }}
+                    {% if wo.work_type == "SERVICE" %}
+                    / Protokół {{ wo.service_report.number|default:"Szkic" }}
+                    {% elif wo.work_type == "MAINTENANCE" %}
+                    / Protokół {{ wo.maintenance_protocol.number|default:"—" }}
+                    {% endif %}
                 </div>
             </div>
-
-            <div class="fw-semibold text-truncate">Zlecenie</div>
         </div>
     </div>
-</div>
-
-<div class="container-fluid py-3" style="padding-bottom: 110px;">
-    <div class="card pwa-card">
-        <div class="card-body">
-            <div class="fw-semibold mb-1">{{ wo.title }}</div>
+    </div>
 
 
-            <div class="small pwa-muted mb-2">
-                {% if wo.number %}<div>Numer: {{ wo.number }}</div>{% endif %}
-                <div>Status: {{ wo.get_status_display }}</div>
-                <div>Typ: {{ wo.get_work_type_display }}</div>
+    <div class="container-fluid py-3" style="padding-bottom: 110px;">
+        <div class="card pwa-card">
+            <div class="card-body">
+                <div class="fw-semibold mb-1">{{ wo.title }}</div>
 
-                {% if wo.planned_date %}
-                <div>Termin: {{ wo.planned_date|date:"d.m.Y" }}</div>
-                {% endif %}
-                {% if wo.planned_time_from or wo.planned_time_to %}
-                <div>Godzina:
-                    {% if wo.planned_time_from %}{{ wo.planned_time_from|time:"H:i" }}{% endif %}
-                    {% if wo.planned_time_to %}– {{ wo.planned_time_to|time:"H:i" }}{% endif %}
+
+                <div class="small pwa-muted mb-2">
+                    {% if wo.number %}<div>Numer: {{ wo.number }}</div>{% endif %}
+                    <div>Status: {{ wo.get_status_display }}</div>
+                    <div>Typ: {{ wo.get_work_type_display }}</div>
+
+                    {% if wo.planned_date %}
+                    <div>Termin: {{ wo.planned_date|date:"d.m.Y" }}</div>
+                    {% endif %}
+                    {% if wo.planned_time_from or wo.planned_time_to %}
+                    <div>Godzina:
+                        {% if wo.planned_time_from %}{{ wo.planned_time_from|time:"H:i" }}{% endif %}
+                        {% if wo.planned_time_to %}– {{ wo.planned_time_to|time:"H:i" }}{% endif %}
+                    </div>
+                    {% endif %}
+
                 </div>
-                {% endif %}
 
-            </div>
+                <hr>
 
-            <hr>
+                <div class="d-flex justify-content-between align-items-start gap-3">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold mb-1">Obiekt</div>
 
-            <div class="d-flex justify-content-between align-items-start gap-3">
-                <div class="flex-grow-1">
-                    <div class="fw-semibold mb-1">Obiekt</div>
+                        {% if wo.site %}
+                        <div class="mb-2">
+                            {{ wo.site.name }}<br>
+                            <span class="small pwa-muted">
+                                {{ wo.site.street }}{% if wo.site.city %}, {{ wo.site.city }}{% endif %}
+                            </span>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-light border mb-2">Brak przypisanego obiektu.</div>
+                        {% endif %}
+                        {% if wo.site.access_info %}
+                        <div class="mt-2">
+                            <div class="fw-semibold small">Dostępy / informacje</div>
+                            <div class="small" style="white-space: pre-wrap;">{{ wo.site.access_info }}</div>
+                        </div>
+                        {% endif %}
+                    </div>
 
                     {% if wo.site %}
-                    <div class="mb-2">
-                        {{ wo.site.name }}<br>
-                        <span class="small pwa-muted">
-                            {{ wo.site.street }}{% if wo.site.city %}, {{ wo.site.city }}{% endif %}
-                        </span>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-light border mb-2">Brak przypisanego obiektu.</div>
-                    {% endif %}
-                    {% if wo.site.access_info %}
-                    <div class="mt-2">
-                        <div class="fw-semibold small">Dostępy / informacje</div>
-                        <div class="small" style="white-space: pre-wrap;">{{ wo.site.access_info }}</div>
+                    <div class="d-grid gap-2" style="min-width: 160px;">
+                        <a class="btn btn-outline-primary pwa-btn"
+                            href="{% url 'core:pwa_objects' %}?site={{ wo.site_id }}">
+                            Szczegóły
+                        </a>
+
+                        {% if wo.site.google_maps_url %}
+                        <a class="btn btn-success pwa-btn" href="{{ wo.site.google_maps_url }}" target="_blank"
+                            rel="noopener">
+                            Nawiguj
+                        </a>
+                        {% else %}
+                        <a class="btn btn-success pwa-btn"
+                            href="https://www.google.com/maps/search/?api=1&query={{ wo.site.street|default:''|urlencode }}%20{{ wo.site.postal_code|default:''|urlencode }}%20{{ wo.site.city|default:''|urlencode }}"
+                            target="_blank" rel="noopener">
+                            Nawiguj
+                        </a>
+                        {% endif %}
                     </div>
                     {% endif %}
                 </div>
 
-                {% if wo.site %}
-                <div class="d-grid gap-2" style="min-width: 160px;">
-                    <a class="btn btn-outline-primary pwa-btn"
-                        href="{% url 'core:pwa_objects' %}?site={{ wo.site_id }}">
-                        Szczegóły
-                    </a>
+                {% if wo.description %}
+                <hr>
+                <div class="fw-semibold mb-1">Opis</div>
+                <div class="small" style="white-space: pre-wrap;">{{ wo.description }}</div>
+                {% endif %}
 
-                    {% if wo.site.google_maps_url %}
-                    <a class="btn btn-success pwa-btn" href="{{ wo.site.google_maps_url }}" target="_blank"
-                        rel="noopener">
-                        Nawiguj
-                    </a>
-                    {% else %}
-                    <a class="btn btn-success pwa-btn"
-                        href="https://www.google.com/maps/search/?api=1&query={{ wo.site.street|default:''|urlencode }}%20{{ wo.site.postal_code|default:''|urlencode }}%20{{ wo.site.city|default:''|urlencode }}"
-                        target="_blank" rel="noopener">
-                        Nawiguj
-                    </a>
-                    {% endif %}
+                {% if wo.systems.all %}
+                <hr>
+                <div class="fw-semibold mb-2">Systemy w zleceniu</div>
+
+                <div class="d-grid gap-2">
+                    {% for s in wo.systems.all %}
+                    <div class="card pwa-card">
+                        <div class="card-body py-2">
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <div class="text-truncate">
+                                    <span class="badge text-bg-info me-1">{{ s.get_system_type_display }}</span>
+                                    <span class="fw-semibold">
+                                        {% if s.manufacturer or s.model %}
+                                        {{ s.manufacturer }} {{ s.model }}
+                                        {% elif s.name %}
+                                        {{ s.name }}
+                                        {% else %}
+                                        —
+                                        {% endif %}
+                                    </span>
+                                </div>
+
+                                <button class="btn btn-outline-secondary pwa-btn" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#sys{{ s.id }}" aria-expanded="false"
+                                    aria-controls="sys{{ s.id }}">
+                                    Szczegóły
+                                </button>
+                            </div>
+
+                            <div id="sys{{ s.id }}" class="collapse mt-2">
+                                <div class="small">
+                                    <div><span class="fw-semibold">Producent:</span> {{ s.manufacturer|default:"—" }}
+                                    </div>
+                                    <div><span class="fw-semibold">Model / typ:</span> {{ s.model|default:"—" }}</div>
+
+                                    {% if s.location_info %}
+                                    <div class="mt-2"><span class="fw-semibold">Lokalizacja:</span><br>
+                                        {{ s.location_info|linebreaksbr }}</div>
+                                    {% endif %}
+                                    {% if s.access_data %}
+                                    <div class="mt-2"><span class="fw-semibold">Dostępy:</span><br>
+                                        {{ s.access_data|linebreaksbr }}</div>
+                                    {% endif %}
+                                    {% if s.procedures %}
+                                    <div class="mt-2"><span class="fw-semibold">Procedury:</span><br>
+                                        {{ s.procedures|linebreaksbr }}</div>
+                                    {% endif %}
+                                    {% if s.notes %}
+                                    <div class="mt-2"><span class="fw-semibold">Notatki:</span><br>
+                                        {{ s.notes|linebreaksbr }}</div>
+                                    {% endif %}
+
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
                 {% endif %}
             </div>
+        </div>
+    </div>
 
-            {% if wo.description %}
-            <hr>
-            <div class="fw-semibold mb-1">Opis</div>
-            <div class="small" style="white-space: pre-wrap;">{{ wo.description }}</div>
-            {% endif %}
-
-            {% if wo.systems.all %}
-            <hr>
-            <div class="fw-semibold mb-2">Systemy w zleceniu</div>
-
-            <div class="d-grid gap-2">
-                {% for s in wo.systems.all %}
-                <div class="card pwa-card">
-                    <div class="card-body py-2">
-                        <div class="d-flex align-items-center justify-content-between gap-2">
-                            <div class="text-truncate">
-                                <span class="badge text-bg-info me-1">{{ s.get_system_type_display }}</span>
-                                <span class="fw-semibold">
-                                    {% if s.manufacturer or s.model %}
-                                    {{ s.manufacturer }} {{ s.model }}
-                                    {% elif s.name %}
-                                    {{ s.name }}
-                                    {% else %}
-                                    —
-                                    {% endif %}
-                                </span>
-                            </div>
-
-                            <button class="btn btn-outline-secondary pwa-btn" type="button" data-bs-toggle="collapse"
-                                data-bs-target="#sys{{ s.id }}" aria-expanded="false" aria-controls="sys{{ s.id }}">
-                                Szczegóły
-                            </button>
-                        </div>
-
-                        <div id="sys{{ s.id }}" class="collapse mt-2">
-                            <div class="small">
-                                <div><span class="fw-semibold">Producent:</span> {{ s.manufacturer|default:"—" }}</div>
-                                <div><span class="fw-semibold">Model / typ:</span> {{ s.model|default:"—" }}</div>
-
-                                {% if s.location_info %}
-                                <div class="mt-2"><span class="fw-semibold">Lokalizacja:</span><br>{{
-                                    s.location_info|linebreaksbr }}</div>
-                                {% endif %}
-                                {% if s.access_data %}
-                                <div class="mt-2"><span class="fw-semibold">Dostępy:</span><br>{{
-                                    s.access_data|linebreaksbr }}</div>
-                                {% endif %}
-                                {% if s.procedures %}
-                                <div class="mt-2"><span class="fw-semibold">Procedury:</span><br>{{
-                                    s.procedures|linebreaksbr }}</div>
-                                {% endif %}
-                                {% if s.notes %}
-                                <div class="mt-2"><span class="fw-semibold">Notatki:</span><br>{{ s.notes|linebreaksbr
-                                    }}</div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
+    {# Przycisk protokołu przyklejony na dole #}
+    <div class="fixed-bottom bg-white border-top">
+        <div class="container-fluid py-2">
+            {% if wo.work_type == "SERVICE" %}
+            <a class="btn btn-primary w-100 pwa-btn" href="{% url 'core:service_report_entry' wo.pk %}">
+                PROTOKÓŁ SERWISOWY
+            </a>
+            {% elif wo.work_type == "MAINTENANCE" and wo.maintenance_protocol_id %}
+            <a class="btn btn-primary w-100 pwa-btn"
+                href="{% url 'core:maintenance_protocol_edit' wo.maintenance_protocol_id %}">
+                PROTOKÓŁ KONSERWACJI
+            </a>
+            {% else %}
+            <button class="btn btn-secondary w-100 pwa-btn" disabled>
+                PROTOKÓŁ (brak)
+            </button>
             {% endif %}
         </div>
     </div>
-</div>
-
-{# Przycisk protokołu przyklejony na dole #}
-<div class="fixed-bottom bg-white border-top">
-    <div class="container-fluid py-2">
-        {% if wo.work_type == "SERVICE" %}
-        <a class="btn btn-primary w-100 pwa-btn" href="{% url 'core:service_report_entry' wo.pk %}">
-            PROTOKÓŁ SERWISOWY
-        </a>
-        {% elif wo.work_type == "MAINTENANCE" and wo.maintenance_protocol_id %}
-        <a class="btn btn-primary w-100 pwa-btn"
-            href="{% url 'core:maintenance_protocol_edit' wo.maintenance_protocol_id %}">
-            PROTOKÓŁ KONSERWACJI
-        </a>
-        {% else %}
-        <button class="btn btn-secondary w-100 pwa-btn" disabled>
-            PROTOKÓŁ (brak)
-        </button>
-        {% endif %}
-    </div>
-</div>
-{% endblock %}
+    {% endblock %}

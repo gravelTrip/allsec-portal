@@ -21,11 +21,13 @@ def pwa_home(request):
     today = date.today()
 
     workorders_today = (
-        WorkOrder.objects
-        .select_related("site")
-        .filter(assigned_to=request.user, planned_date=today)
-        .order_by("planned_time_from", "planned_time_to", "id")
-    )
+    WorkOrder.objects
+    .select_related("site")
+    .prefetch_related("systems")
+    .filter(assigned_to=request.user, planned_date=today)
+    .order_by("planned_time_from", "planned_time_to", "id")
+)
+    workorders_today = _attach_workorder_system_badges(list(workorders_today))
 
     return render(
         request,
@@ -68,12 +70,33 @@ def _serialize_system(system: System) -> dict:
         "updated_at": system.updated_at.isoformat() if system.updated_at else None,
     }
 
-login_required
+def _attach_workorder_system_badges(workorders):
+    # mapowanie wartości choices -> label (np. "CCTV", "SSP"...)
+    choices = dict(System._meta.get_field("system_type").choices)
+
+    for wo in workorders:
+        seen = set()
+        labels = []
+        for s in wo.systems.all():
+            key = getattr(s, "system_type", None)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            labels.append(choices.get(key, str(key)))
+
+        wo.pwa_system_badges = labels[:4]
+        wo.pwa_system_badges_more = max(0, len(labels) - 4)
+
+    return workorders
+
+
+@login_required
 def pwa_workorder_list(request):
     workorders = (
         WorkOrder.objects
         .select_related("site")
         .filter(assigned_to=request.user)
+        .prefetch_related("systems")
         .annotate(
             _no_date=Case(
                 When(planned_date__isnull=True, then=Value(1)),
@@ -83,6 +106,9 @@ def pwa_workorder_list(request):
         )
         .order_by("_no_date", "planned_date", "planned_time_from", "planned_time_to", "id")
     )
+
+    workorders = _attach_workorder_system_badges(list(workorders))
+
 
     return render(
         request,
