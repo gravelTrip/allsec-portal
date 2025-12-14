@@ -5,15 +5,10 @@
 {% block content %}
 <div class="pwa-topbar bg-white border-bottom">
     <div class="container-fluid py-2">
-        <div class="d-flex align-items-center justify-content-between gap-2">
-            <a class="btn btn-primary pwa-btn" href="{% url 'core:pwa_home' %}">
-                ← Powrót
-            </a>
-
-            <div class="fw-semibold">Obiekty</div>
-
-            <div style="width: 110px;"></div>
-        </div>
+        <button type="button" class="btn btn-primary pwa-btn" data-pwa-back
+            data-fallback="{{ back_url|default:'/pwa/' }}">
+            ← Powrót
+        </button>
 
         <div class="mt-2">
             <input id="searchBox" class="form-control form-control-lg"

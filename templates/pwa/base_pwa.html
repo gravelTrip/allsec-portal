@@ -51,6 +51,25 @@
             });
         }
     </script>
+    <script>
+        // PWA Back: działa jak "Wstecz" w przeglądarce.
+        // Fallback: jeśli brak historii, idź na URL z data-fallback albo /pwa/
+        function pwaBack(fallbackUrl) {
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            window.location.href = fallbackUrl || "/pwa/";
+        }
+
+        document.addEventListener("click", (e) => {
+            const el = e.target.closest("[data-pwa-back]");
+            if (!el) return;
+            e.preventDefault();
+            pwaBack(el.getAttribute("data-fallback"));
+        });
+    </script>
+
     {% block extra_js %}{% endblock %}
 </body>
 

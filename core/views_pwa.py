@@ -1,7 +1,7 @@
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from .models import WorkOrder
 
@@ -11,7 +11,10 @@ from django.views.decorators.http import require_GET
 
 from .models import Site, System
 
+from django.db.models import Case, When, Value, IntegerField 
 
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 
 @login_required
 def pwa_home(request):
@@ -65,6 +68,28 @@ def _serialize_system(system: System) -> dict:
         "updated_at": system.updated_at.isoformat() if system.updated_at else None,
     }
 
+login_required
+def pwa_workorder_list(request):
+    workorders = (
+        WorkOrder.objects
+        .select_related("site")
+        .filter(assigned_to=request.user)
+        .annotate(
+            _no_date=Case(
+                When(planned_date__isnull=True, then=Value(1)),
+                default=Value(0),
+                output_field=IntegerField(),
+            )
+        )
+        .order_by("_no_date", "planned_date", "planned_time_from", "planned_time_to", "id")
+    )
+
+    return render(
+        request,
+        "pwa/workorder_list.html",
+        {"workorders": workorders},
+    )
+
 @require_GET
 @login_required
 def api_pwa_catalog_dump(request: HttpRequest) -> JsonResponse:
@@ -81,7 +106,17 @@ def api_pwa_catalog_dump(request: HttpRequest) -> JsonResponse:
 
 @login_required
 def pwa_objects(request):
-    return render(request, "pwa/objects.html")
+    back = request.GET.get("back", "")
+    back_url = reverse("core:pwa_home")
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        back_url = back
+
+    return render(request, "pwa/objects.html", {"back_url": back_url})
 
 
 
@@ -91,6 +126,7 @@ def pwa_sw(request):
 const CACHE_NAME = "allsec-pwa-shell-v3";
 const SHELL_URLS = [
   "/pwa/",
+  "/pwa/zlecenia/",
   "/pwa/obiekty/",
   "/static/css/main.css",
   "/static/pwa/pwa.js",
@@ -149,3 +185,12 @@ self.addEventListener("fetch", (event) => {
 @login_required
 def api_pwa_ping(request):
     return JsonResponse({"ok": True, "server_time": timezone.now().isoformat()})
+
+@login_required
+def pwa_workorder_detail(request, pk: int):
+    wo = get_object_or_404(
+        WorkOrder.objects.select_related("site").prefetch_related("systems"),
+        pk=pk,
+        assigned_to=request.user,
+    )
+    return render(request, "pwa/workorder_detail.html", {"wo": wo, "current_path": request.get_full_path()})
