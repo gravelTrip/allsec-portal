@@ -2,7 +2,7 @@
 // Minimalny helper IndexedDB bez bibliotek zewnętrznych.
 
 const DB_NAME = "allsec_pwa";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -25,6 +25,11 @@ function openDb() {
       // meta: na ustawienia / last_sync itp.
       if (!db.objectStoreNames.contains("meta")) {
         db.createObjectStore("meta", { keyPath: "key" });
+      }
+
+      // workorders: klucz id
+      if (!db.objectStoreNames.contains("workorders")) {
+        db.createObjectStore("workorders", { keyPath: "id" });
       }
     };
 

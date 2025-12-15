@@ -1,5 +1,5 @@
 // core/static/pwa/pwa.js
-import { clearStore, putMany, setMeta, getMeta } from "./idb.js";
+import { clearStore, putMany, setMeta, getMeta, getAll, getByKey } from "./idb.js";
 
 function $(id) {
   return document.getElementById(id);
@@ -44,54 +44,303 @@ function setBusy(isBusy) {
   btn.textContent = isBusy ? "SYNC…" : "SYNC";
 }
 
-async function doSyncCatalog() {
+async function syncCatalog() {
+  const resp = await fetch("/api/pwa/catalog/dump/", {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!resp.ok) throw new Error(`CATALOG HTTP ${resp.status}`);
+  const data = await resp.json();
+
+  await clearStore("sites");
+  await clearStore("systems");
+  await putMany("sites", data.sites || []);
+  await putMany("systems", data.systems || []);
+
+  return { sites: data.sites?.length || 0, systems: data.systems?.length || 0 };
+}
+
+async function syncWorkorders() {
+  const resp = await fetch("/api/pwa/workorders/dump/", {
+    method: "GET",
+    headers: { "Accept": "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!resp.ok) throw new Error(`WORKORDERS HTTP ${resp.status}`);
+  const data = await resp.json();
+
+  await clearStore("workorders");
+  await putMany("workorders", data.workorders || []);
+
+  return { workorders: data.workorders?.length || 0 };
+}
+
+let syncInProgress = false;
+
+async function doSyncAll({ silent = false } = {}) {
+  if (syncInProgress) return;
   if (!navigator.onLine) {
-    alert("Brak internetu — nie mogę zsynchronizować teraz.");
+    if (!silent) alert("Brak internetu — nie mogę zsynchronizować teraz.");
     return;
   }
 
+  syncInProgress = true;
   setBusy(true);
+
   try {
-    const resp = await fetch("/api/pwa/catalog/dump/", {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-    const data = await resp.json();
-
-    await clearStore("sites");
-    await clearStore("systems");
-    await putMany("sites", data.sites || []);
-    await putMany("systems", data.systems || []);
+    const cat = await syncCatalog();
+    const wo = await syncWorkorders();
 
     const stamp = new Date().toLocaleString("pl-PL");
     await setMeta("last_sync", stamp);
+    await setMeta("last_sync_ts", Date.now());
 
     if ($("lastSync")) $("lastSync").textContent = stamp;
 
-    alert(`SYNC OK ✅\nObiekty: ${data.sites?.length || 0}\nSystemy: ${data.systems?.length || 0}`);
+    if (!silent) {
+      alert(
+        `SYNC OK ✅\nObiekty: ${cat.sites}\nSystemy: ${cat.systems}\nZlecenia: ${wo.workorders}`
+      );
+    }
   } catch (err) {
     console.error(err);
-    alert("SYNC nieudany ❌\n" + (err?.message || err));
+    if (!silent) alert("SYNC nieudany ❌\n" + (err?.message || err));
   } finally {
     setBusy(false);
+    syncInProgress = false;
   }
 }
+
 
 export function initPwaHome() {
   updateOnlineUI();
   loadLastSync();
 
   const btn = $("syncBtn");
-  if (btn) btn.addEventListener("click", doSyncCatalog);
+  if (btn) btn.addEventListener("click", () => doSyncAll({ silent: false }));
 
   // ping co 10s + po powrocie na kartę
   setInterval(updateOnlineUI, 10000);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) updateOnlineUI();
   });
+
+  // auto-sync: co 5 minut, tylko jak online i nie trwa sync
+  setInterval(async () => {
+    if (document.hidden) return;
+    if (syncInProgress) return;
+
+    const ok = await pingServer(800);
+    if (!ok) return;
+
+    const lastTs = await getMeta("last_sync_ts");
+    const tooOld = !lastTs || (Date.now() - Number(lastTs)) > (5 * 60 * 1000);
+    if (!tooOld) return;
+
+    await doSyncAll({ silent: true });
+  }, 60 * 1000); // sprawdzaj co minutę, sync max co 5 min
+
+  initPwaWorkordersUi();
+
 }
+
+function esc(s) {
+  return String(s ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function nl2br(s) {
+  const safe = esc(s);
+  return safe.replaceAll("\n", "<br>");
+}
+
+function getWorkorderIdFromPath() {
+  const m = window.location.pathname.match(/^\/pwa\/zlecenia\/(\d+)\/?$/);
+  return m ? Number(m[1]) : null;
+}
+
+
+
+function renderWorkorderCard(wo) {
+  const siteLine = wo.site?.name
+    ? `${wo.site.name}${(wo.site.street || wo.site.city) ? " - " : ""}${wo.site.street || ""}${wo.site.city ? " " + wo.site.city : ""}`
+    : "Brak obiektu";
+
+  const timeLine = `${wo.planned_time_from || ""}${wo.planned_time_to ? "–" + wo.planned_time_to : ""}`;
+
+  const badges = [
+    `<span class="badge text-bg-secondary">${wo.status_label || ""}</span>`,
+    `<span class="badge text-bg-info">${wo.work_type_label || ""}</span>`,
+    ...(wo.system_badges || []).map(lbl => `<span class="badge text-bg-light border text-dark">${lbl}</span>`),
+    wo.system_badges_more ? `<span class="badge text-bg-light border text-dark">+${wo.system_badges_more}</span>` : ""
+  ].join(" ");
+
+  return `
+    <a class="card pwa-card text-decoration-none text-dark" href="/pwa/zlecenia/${wo.id}/">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div>
+            <div class="fw-semibold">${wo.title || ""}</div>
+            <div class="small pwa-muted">${siteLine}</div>
+          </div>
+          <div class="small text-end pwa-muted">${timeLine}</div>
+        </div>
+        <div class="mt-2">${badges}</div>
+      </div>
+    </a>
+  `;
+}
+
+async function renderWorkorderDetailOffline(woId) {
+  const container = document.querySelector(".container-fluid.py-3");
+  if (!container) return;
+
+  const wo = await getByKey("workorders", woId);
+  if (!wo) {
+    container.innerHTML = `<div class="alert alert-warning border">Brak zlecenia w offline cache. Zrób SYNC.</div>`;
+    return;
+  }
+
+  const siteId = wo.site?.id ?? wo.site_id ?? null;
+  const site = siteId ? await getByKey("sites", siteId) : null;
+
+  let systems = [];
+  if (Array.isArray(wo.system_ids) && wo.system_ids.length) {
+    const arr = [];
+    for (const sid of wo.system_ids) {
+      const s = await getByKey("systems", sid);
+      if (s) arr.push(s);
+    }
+    systems = arr;
+  }
+
+  const siteLine = site
+    ? `${esc(site.name)}${(site.street || site.city) ? " - " : ""}${esc(site.street || "")}${site.city ? " " + esc(site.city) : ""}`
+    : (wo.site?.name ? esc(wo.site.name) : "Brak obiektu");
+
+  const timeLine = `${wo.planned_time_from || ""}${wo.planned_time_to ? "–" + wo.planned_time_to : ""}`;
+
+  container.innerHTML = `
+    <div class="card pwa-card">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 mb-2">
+          <button type="button"
+                  class="btn btn-primary pwa-btn"
+                  data-pwa-back
+                  data-fallback="/pwa/zlecenia/">
+            ← Powrót
+          </button>
+          <div class="small text-truncate">
+            <div class="fw-semibold">
+              Zlecenie ${esc(wo.work_type_label || "")}
+              ${wo.number ? esc(wo.number) : ""}
+              ${wo.planned_date ? " z " + esc(wo.planned_date.split("-").reverse().join(".")) : ""}
+            </div>
+          </div>
+        </div>
+
+        <div class="fw-semibold mb-1">${esc(wo.title || "")}</div>
+
+        <div class="small pwa-muted mb-2">
+          <div>Status: ${esc(wo.status_label || "")}</div>
+          <div>Typ: ${esc(wo.work_type_label || "")}</div>
+          ${wo.planned_date ? `<div>Termin: ${esc(wo.planned_date.split("-").reverse().join("."))}</div>` : ""}
+          ${(wo.planned_time_from || wo.planned_time_to) ? `<div>Godzina: ${esc(timeLine)}</div>` : ""}
+        </div>
+
+        <hr>
+
+        <div class="fw-semibold mb-1">Obiekt</div>
+        <div class="mb-2">${siteLine}</div>
+
+        ${site?.access_info ? `
+          <div class="mt-2">
+            <div class="fw-semibold small">Dostępy / informacje</div>
+            <div class="small">${nl2br(site.access_info)}</div>
+          </div>
+        ` : ""}
+
+        ${wo.description ? `
+          <hr>
+          <div class="fw-semibold mb-1">Opis</div>
+          <div class="small">${nl2br(wo.description)}</div>
+        ` : ""}
+
+        <hr>
+        <div class="fw-semibold mb-2">Systemy w zleceniu</div>
+
+        ${
+          systems.length
+          ? systems.map(s => `
+              <details class="card pwa-card mb-2">
+                <summary class="card-body py-2" style="cursor:pointer;">
+                  <span class="badge text-bg-info me-1">${esc(s.system_type || "")}</span>
+                  <span class="fw-semibold">${esc((s.manufacturer || "") + " " + (s.model || "")).trim() || esc(s.name || "—")}</span>
+                </summary>
+                <div class="card-body small pt-0">
+                  <div><span class="fw-semibold">Producent:</span> ${esc(s.manufacturer || "—")}</div>
+                  <div><span class="fw-semibold">Model / typ:</span> ${esc(s.model || "—")}</div>
+                  ${s.location_info ? `<div class="mt-2"><span class="fw-semibold">Lokalizacja:</span><br>${nl2br(s.location_info)}</div>` : ""}
+                  ${s.access_data ? `<div class="mt-2"><span class="fw-semibold">Dostępy:</span><br>${nl2br(s.access_data)}</div>` : ""}
+                  ${s.procedures ? `<div class="mt-2"><span class="fw-semibold">Procedury:</span><br>${nl2br(s.procedures)}</div>` : ""}
+                  ${s.notes ? `<div class="mt-2"><span class="fw-semibold">Notatki:</span><br>${nl2br(s.notes)}</div>` : ""}
+                </div>
+              </details>
+            `).join("")
+          : `<div class="alert alert-light border mb-0">Brak systemów w offline cache. Zrób SYNC.</div>`
+        }
+
+        <div class="fixed-bottom bg-white border-top">
+          <div class="container-fluid py-2">
+            <button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
+              PROTOKÓŁ (wymaga online – etap 5)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+
+export async function initPwaWorkordersUi() {
+  const woId = getWorkorderIdFromPath();
+
+  const ok = await pingServer(800);
+  if (!ok && woId) {
+    await renderWorkorderDetailOffline(woId);
+    return;
+  }
+
+  const nodes = document.querySelectorAll("[data-pwa-workorders]");
+  if (!nodes.length) return;
+
+  if (ok) return; // online: zostaw server-render
+
+  const all = await getAll("workorders");
+
+  for (const node of nodes) {
+    const mode = node.dataset.mode || "all";
+    let items = all.slice();
+
+    if (mode === "today") {
+      const todayIso = node.dataset.todayIso;
+      if (todayIso) items = items.filter(w => w.planned_date === todayIso);
+    }
+
+    // sort: data + godzina
+    items.sort((a, b) => (a.planned_time_from || "").localeCompare(b.planned_time_from || ""));
+
+    node.innerHTML = items.length
+      ? items.map(renderWorkorderCard).join("")
+      : `<div class="alert alert-light border">Brak zleceń offline. Zrób SYNC.</div>`;
+  }
+}
+

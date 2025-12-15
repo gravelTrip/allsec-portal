@@ -14,6 +14,9 @@ urlpatterns = [
     path("pwa/zlecenia/", views_pwa.pwa_workorder_list, name="pwa_workorder_list"),
     path("pwa/zlecenia/<int:pk>/", views_pwa.pwa_workorder_detail, name="pwa_workorder_detail"),
 
+    path("api/pwa/workorders/dump/", views_pwa.api_pwa_workorders_dump, name="api_pwa_workorders_dump"),
+
+
     path("pwa/sw.js", views_pwa.pwa_sw, name="pwa_sw"),
     path("api/pwa/ping/", views_pwa.api_pwa_ping, name="api_pwa_ping"),
 

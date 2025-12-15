@@ -9,7 +9,7 @@ from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_GET
 
-from .models import Site, System
+from .models import Site, System, WorkOrder
 
 from django.db.models import Case, When, Value, IntegerField 
 
@@ -211,6 +211,62 @@ self.addEventListener("fetch", (event) => {
 @login_required
 def api_pwa_ping(request):
     return JsonResponse({"ok": True, "server_time": timezone.now().isoformat()})
+
+@login_required
+def api_pwa_workorders_dump(request):
+    user = request.user
+
+    qs = (
+        WorkOrder.objects
+        .select_related("site")
+        .prefetch_related("systems")
+        .filter(assigned_to=user)
+        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+        .order_by("planned_date", "planned_time_from", "id")
+    )
+
+    # mapowanie choices system_type -> label
+    type_labels = dict(System._meta.get_field("system_type").choices)
+
+    workorders = []
+    for wo in qs:
+        site = wo.site
+        # badge z typów systemów (unikalne)
+        seen = set()
+        labels = []
+        for s in wo.systems.all():
+            k = getattr(s, "system_type", None)
+            if not k or k in seen:
+                continue
+            seen.add(k)
+            labels.append(type_labels.get(k, str(k)))
+
+        workorders.append({
+            "id": wo.id,
+            "title": wo.title,
+            "status_label": wo.get_status_display(),
+            "work_type_label": wo.get_work_type_display(),
+            "planned_date": wo.planned_date.isoformat() if wo.planned_date else None,
+            "planned_time_from": wo.planned_time_from.strftime("%H:%M") if wo.planned_time_from else None,
+            "planned_time_to": wo.planned_time_to.strftime("%H:%M") if wo.planned_time_to else None,
+            "site": {
+                "id": site.id if site else None,
+                "name": site.name if site else None,
+                "street": site.street if site else None,
+                "city": site.city if site else None,
+            },
+            "system_badges": labels[:4],
+            "system_badges_more": max(0, len(labels) - 4),
+            "number": wo.number,
+            "description": wo.description,
+            "site_id": site.id if site else None,
+            "system_ids": [s.id for s in wo.systems.all()],
+        })
+
+    return JsonResponse({
+        "generated_at": timezone.now().isoformat(),
+        "workorders": workorders,
+    })
 
 @login_required
 def pwa_workorder_detail(request, pk: int):

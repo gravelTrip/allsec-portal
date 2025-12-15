@@ -32,7 +32,7 @@
     <h5 class="mb-3">Zlecenia na dziś ({{ today|date:"d.m.Y" }})</h5>
 
     {% if workorders_today %}
-    <div class="d-grid gap-2">
+    <div class="d-grid gap-2" data-pwa-workorders data-mode="today" data-today-iso="{{ today|date:'Y-m-d' }}">
         {% for wo in workorders_today %}
         <a class="card pwa-card text-decoration-none text-dark" href="{% url 'core:pwa_workorder_detail' wo.pk %}">
             <div class="card-body">

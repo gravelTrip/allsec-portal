@@ -2,7 +2,7 @@
 // SW tylko dla "app shell": PWA strony + statyki.
 // Dane są w IndexedDB, więc NIE cache'ujemy /api/.
 
-const CACHE_NAME = "allsec-pwa-shell-v2";
+const CACHE_NAME = "allsec-pwa-shell-v3";
 
 const SHELL_URLS = [
   "/pwa/",
@@ -11,6 +11,7 @@ const SHELL_URLS = [
   "/static/pwa/pwa.js",
   "/static/pwa/idb.js",
   "/static/pwa/objects.js",
+  "/pwa/zlecenia/",
 ];
 
 self.addEventListener("install", (event) => {
@@ -52,6 +53,12 @@ self.addEventListener("fetch", (event) => {
           // offline: najpierw spróbuj stronę po pathname (ignorujemy querystring)
           const cachedExact = await caches.match(url.pathname, { ignoreSearch: true });
           if (cachedExact) return cachedExact;
+          // jeśli to szczegóły zlecenia (/pwa/zlecenia/<id>/), a nie mamy exact w cache,
+          // oddaj shell listy zleceń, który ma JS do renderu offline
+          if (url.pathname.startsWith("/pwa/zlecenia/")) {
+            const cachedList = await caches.match("/pwa/zlecenia/", { ignoreSearch: true });
+            if (cachedList) return cachedList;
+          }
 
           // fallback na /pwa/
           return caches.match("/pwa/", { ignoreSearch: true });
