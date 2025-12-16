@@ -14,7 +14,8 @@
     {% if workorders %}
     <div class="d-grid gap-2" data-pwa-workorders data-mode="all">
         {% for wo in workorders %}
-        <a class="card pwa-card text-decoration-none text-dark" href="{% url 'core:pwa_workorder_detail' wo.pk %}">
+        <a class="card pwa-card text-decoration-none text-dark"
+            href="{% url 'core:pwa_workorder_detail' wo.pk %}?back={% url 'core:pwa_workorder_list' %}">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div>

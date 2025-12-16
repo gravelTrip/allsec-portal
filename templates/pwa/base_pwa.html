@@ -55,12 +55,21 @@
         // PWA Back: działa jak "Wstecz" w przeglądarce.
         // Fallback: jeśli brak historii, idź na URL z data-fallback albo /pwa/
         function pwaBack(fallbackUrl) {
+            // Jeśli mamy fallback (czyli "wiemy gdzie wrócić") -> NIE używamy historii (bo robi pętle)
+            if (fallbackUrl) {
+                window.location.href = fallbackUrl;
+                return;
+            }
+
+            // Dopiero jak nie ma fallbacku, próbujemy historii
             if (window.history.length > 1) {
                 window.history.back();
                 return;
             }
-            window.location.href = fallbackUrl || "/pwa/";
+
+            window.location.href = "/pwa/";
         }
+
 
         document.addEventListener("click", (e) => {
             const el = e.target.closest("[data-pwa-back]");

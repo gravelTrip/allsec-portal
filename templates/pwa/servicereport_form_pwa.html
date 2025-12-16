@@ -1,0 +1,94 @@
+{% extends "pwa/base_pwa.html" %}
+
+{% block title %}PWA – Protokół serwisowy{% endblock %}
+
+{% block content %}
+<div class="pwa-topbar bg-white border-bottom">
+    <div class="container-fluid py-2">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <button type="button" class="btn btn-outline-primary pwa-btn" id="srBackBtn">
+                ← Powrót
+            </button>
+
+            <div class="small text-end">
+                <div class="fw-semibold">
+                    Zlecenie: {{ wo.title }}
+                </div>
+                <div class="text-muted">
+                    {% if sr.number %}Protokół: {{ sr.number }}{% else %}Protokół: szkic{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid py-3">
+    <div class="card pwa-card">
+        <div class="card-body">
+            <form method="post" data-pwa-sr-form data-sr-id="{{ sr.pk }}" data-wo-id="{{ wo.pk }}"
+                data-back-url="{{ back_url|default:'/pwa/zlecenia/' }}">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                {% for field in form.visible_fields %}
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="{{ field.id_for_label }}">
+                        {{ field.label }}
+                    </label>
+
+                    {% if field.name == "work_performed" %}
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted">
+                            Historia wizyt – dopisuj kolejne wpisy w formacie „Wizyta X – dd.mm.rrrr – …”
+                        </small>
+                        <button type="button" class="btn btn-sm btn-outline-secondary pwa-btn" id="add-visit-entry">
+                            Dodaj wizytę
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    {{ field }}
+
+                    {% if field.name == "work_performed" %}
+                    <div class="form-text small">
+                        Przykład:<br>
+                        Wizyta 1 – 28.11.2025 – Jan Kowalski<br>
+                        – Wykonano diagnostykę…<br>
+                        – Stwierdzono uszkodzenie…
+                    </div>
+                    {% endif %}
+
+                    {% if field.errors %}
+                    <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                    {% endif %}
+                    {% if field.help_text %}
+                    <div class="text-muted small">{{ field.help_text }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                <div style="height: 72px;"></div> {# miejsce pod sticky button #}
+
+                <div class="pwa-sticky-save border-top bg-white">
+                    <button type="submit" class="btn btn-dark w-100 pwa-btn">
+                        ZAPISZ
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module">
+    import { initPwaServiceReportForm } from "/static/pwa/pwa.js";
+    initPwaServiceReportForm();
+</script>
+{% endblock %}

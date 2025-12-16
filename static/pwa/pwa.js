@@ -1,5 +1,5 @@
 // core/static/pwa/pwa.js
-import { clearStore, putMany, setMeta, getMeta, getAll, getByKey } from "./idb.js";
+import { clearStore, putMany, setMeta, getMeta, getAll, getByKey, putSrDraft, getSrDraft, enqueueOutbox, listOutbox, deleteOutbox } from "./idb.js";
 
 function $(id) {
   return document.getElementById(id);
@@ -80,6 +80,38 @@ async function syncWorkorders() {
 
 let syncInProgress = false;
 
+async function warmServiceReportPagesCache() {
+  if (!("caches" in window)) return;
+
+  const CACHE_NAME = "allsec-pwa-shell-v4";
+  const cache = await caches.open(CACHE_NAME);
+
+  const wos = await getAll("workorders");
+  
+  // Cache'owanie szczegółów protokołów
+  const serviceReportUrls = (wos || [])
+    .filter(w => w?.service_report_id)
+    .map(w => `/pwa/protokoly/serwis/${w.service_report_id}/`);
+
+  // Cache'owanie szczegółów zleceń
+  const workorderUrls = (wos || [])
+    .map(w => `/pwa/zlecenia/${w.id}/`);
+
+  // Łączymy oba URL-e do cache'owania
+  const allUrls = [...serviceReportUrls, ...workorderUrls];
+
+  for (const url of allUrls) {
+    try {
+      const resp = await fetch(url, { credentials: "same-origin", cache: "no-store" });
+      if (resp.ok) await cache.put(url, resp.clone());
+    } catch (e) {
+      console.warn("warm cache failed:", url, e);
+    }
+  }
+}
+
+
+
 async function doSyncAll({ silent = false } = {}) {
   if (syncInProgress) return;
   if (!navigator.onLine) {
@@ -87,12 +119,15 @@ async function doSyncAll({ silent = false } = {}) {
     return;
   }
 
+  await processOutbox();
+
   syncInProgress = true;
   setBusy(true);
 
   try {
     const cat = await syncCatalog();
     const wo = await syncWorkorders();
+    await warmServiceReportPagesCache(); // Cache'owanie raportów i zleceń
 
     const stamp = new Date().toLocaleString("pl-PL");
     await setMeta("last_sync", stamp);
@@ -113,6 +148,7 @@ async function doSyncAll({ silent = false } = {}) {
     syncInProgress = false;
   }
 }
+
 
 
 export function initPwaHome() {
@@ -297,13 +333,21 @@ async function renderWorkorderDetailOffline(woId) {
           : `<div class="alert alert-light border mb-0">Brak systemów w offline cache. Zrób SYNC.</div>`
         }
 
-        <div class="fixed-bottom bg-white border-top">
+                <div class="fixed-bottom bg-white border-top">
           <div class="container-fluid py-2">
-            <button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
-              PROTOKÓŁ (wymaga online – etap 5)
-            </button>
+            ${
+              wo.service_report_id
+                ? `<a class="btn btn-primary w-100 pwa-btn"
+                      href="/pwa/protokoly/serwis/${wo.service_report_id}/">
+                      PROTOKÓŁ
+                   </a>`
+                : `<button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
+                      PROTOKÓŁ (zrób SYNC online)
+                   </button>`
+            }
           </div>
         </div>
+
       </div>
     </div>
   `;
@@ -343,4 +387,232 @@ export async function initPwaWorkordersUi() {
       : `<div class="alert alert-light border">Brak zleceń offline. Zrób SYNC.</div>`;
   }
 }
+
+function getCookie(name) {
+  const v = `; ${document.cookie}`;
+  const parts = v.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+  return "";
+}
+
+async function processOutbox() {
+  if (!navigator.onLine) return;
+
+  const items = await listOutbox();
+  if (!items.length) return;
+
+  // (prosto) przetwarzamy po kolei, jak coś padnie — zostawiamy resztę na później
+  for (const item of items.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))) {
+    if (item.kind === "servicereport_save") {
+      const payload = item.payload || {};
+      if (payload.fields?.report_date) {
+        payload.fields.report_date = normalizeDateToIso(payload.fields.report_date);
+      }
+    
+      const resp = await fetch("/api/pwa/servicereport/save/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+      });
+
+      if (!resp.ok) {
+        // nie kasujemy z kolejki — spróbujemy następnym razem
+        break;
+      }
+
+      await deleteOutbox(item.id);
+    }
+  }
+}
+
+function serializeForm(form) {
+  const fd = new FormData(form);
+  const out = {};
+  for (const [k, v] of fd.entries()) {
+    if (k === "csrfmiddlewaretoken") continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function normalizeDateToIso(value) {
+  if (!value) return "";
+  const s = String(value).trim();
+
+  // już OK
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  // DD.MM.YYYY -> YYYY-MM-DD
+  const m = /^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);
+  if (m) {
+    const dd = m[1].padStart(2, "0");
+    const mm = m[2].padStart(2, "0");
+    const yyyy = m[3];
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return s;
+}
+
+
+function applyFieldsToForm(form, fields) {
+  Object.entries(fields || {}).forEach(([name, value]) => {
+    const el = form.elements.namedItem(name);
+    if (!el) return;
+
+    // RadioNodeList / HTMLCollection
+    if (el instanceof RadioNodeList) {
+      for (const opt of el) opt.checked = (opt.value === value);
+      return;
+    }
+
+    if (el.type === "checkbox") {
+      el.checked =
+        value === true ||
+        value === "on" ||
+        value === "true" ||
+        value === 1 ||
+        value === "1";
+      return;
+    }
+
+    if (el.type === "date") {
+      el.value = normalizeDateToIso(value);
+      return;
+    }
+
+    el.value = value ?? "";
+  });
+}
+
+
+export function initPwaServiceReportForm() {
+  const form = document.querySelector("form[data-pwa-sr-form]");
+  if (!form) return;
+
+  const srId = parseInt(form.dataset.srId || "", 10);
+  const woId = parseInt(form.dataset.woId || "", 10);
+  const backUrl = form.dataset.backUrl || "/pwa/";
+  const backBtn = document.getElementById("srBackBtn");
+
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+      window.location.replace(backUrl);
+    });
+  }
+
+  if (!srId) return;
+
+  // =========================
+  // 0) Przycisk "Dodaj wizytę" (dopisywanie bloku do work_performed)
+  // =========================
+  const visitBtn = document.getElementById("add-visit-entry");
+  const visitTextarea = document.getElementById("id_work_performed");
+
+  if (visitBtn && visitTextarea) {
+    visitBtn.addEventListener("click", () => {
+      let value = visitTextarea.value || "";
+
+      // znajdź max numer "Wizyta X"
+      const regex = /Wizyta\s+(\d+)/g;
+      let maxVisit = 0;
+      let match;
+      while ((match = regex.exec(value)) !== null) {
+        const num = parseInt(match[1], 10);
+        if (!isNaN(num) && num > maxVisit) maxVisit = num;
+      }
+      const nextVisit = maxVisit + 1;
+
+      // dd.mm.yyyy
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, "0");
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const yyyy = today.getFullYear();
+      const dateStr = `${dd}.${mm}.${yyyy}`;
+
+      // technik z pola (jeśli jest)
+      const techEl = document.getElementById("id_technicians");
+      const tech = (techEl?.value || "").trim();
+
+      const prefix = value.trim().length > 0 ? "\n\n" : "";
+      const newBlock =
+        `${prefix}Wizyta ${nextVisit} – ${dateStr}` +
+        (tech ? ` – ${tech}` : "") +
+        "\n– ";
+
+      visitTextarea.value = value + newBlock;
+
+      // kursor na koniec + trigger autosave
+      visitTextarea.focus();
+      visitTextarea.selectionStart = visitTextarea.selectionEnd = visitTextarea.value.length;
+      visitTextarea.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  // =========================
+  // 1) Restore draft (jeśli jest)
+  // =========================
+  getSrDraft(srId).then((draft) => {
+    if (draft?.fields) applyFieldsToForm(form, draft.fields);
+  });
+
+  // =========================
+  // 2) Autosave draft
+  // =========================
+  let t = null;
+  const saveDraft = async () => {
+    const fields = serializeForm(form);
+    await putSrDraft(srId, { wo_id: woId, fields });
+  };
+
+  const onChange = () => {
+    clearTimeout(t);
+    t = setTimeout(saveDraft, 500);
+  };
+
+  form.addEventListener("input", onChange);
+  form.addEventListener("change", onChange);
+
+  // =========================
+  // 3) SUBMIT: zawsze przechwytujemy (pingServer decyduje)
+  // =========================
+  let allowNativeSubmit = false;
+
+  form.addEventListener("submit", async (e) => {
+    if (allowNativeSubmit) return;
+
+    e.preventDefault();
+
+    // HTML5 validation
+    if (typeof form.checkValidity === "function" && !form.checkValidity()) {
+      if (typeof form.reportValidity === "function") form.reportValidity();
+      return;
+    }
+
+    const ok = await pingServer(800);
+
+    if (ok) {
+      // ONLINE: normalny POST Django
+      allowNativeSubmit = true;
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+      return;
+    }
+
+    // OFFLINE: draft + outbox
+    const fields = serializeForm(form);
+    await putSrDraft(srId, { wo_id: woId, fields });
+    await enqueueOutbox("servicereport_save", { sr_id: srId, wo_id: woId, fields });
+
+    window.location.replace(backUrl);
+  });
+}
+
 

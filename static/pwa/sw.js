@@ -2,7 +2,7 @@
 // SW tylko dla "app shell": PWA strony + statyki.
 // Dane są w IndexedDB, więc NIE cache'ujemy /api/.
 
-const CACHE_NAME = "allsec-pwa-shell-v3";
+const CACHE_NAME = "allsec-pwa-shell-v4";
 
 const SHELL_URLS = [
   "/pwa/",
@@ -61,6 +61,11 @@ self.addEventListener("fetch", (event) => {
           }
 
           // fallback na /pwa/
+          if (url.pathname.startsWith("/pwa/protokoly/serwis/")) {
+            const cachedList = await caches.match("/pwa/zlecenia/", { ignoreSearch: true });
+            if (cachedList) return cachedList;
+          }
+
           return caches.match("/pwa/", { ignoreSearch: true });
         })
     );
@@ -76,7 +81,17 @@ self.addEventListener("fetch", (event) => {
         .then((resp) => {
           if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/pwa/")) {
             const copy = resp.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+            try {
+              if (resp && resp.ok) {
+                const copy = resp.clone();
+                caches.open(CACHE_NAME)
+                  .then(cache => cache.put(req, copy))
+                  .catch(() => {});
+              }
+            } catch (e) {
+              // ignorujemy błąd klonowania
+            }
+            return resp;
           }
           return resp;
         })

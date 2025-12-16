@@ -14,7 +14,11 @@ urlpatterns = [
     path("pwa/zlecenia/", views_pwa.pwa_workorder_list, name="pwa_workorder_list"),
     path("pwa/zlecenia/<int:pk>/", views_pwa.pwa_workorder_detail, name="pwa_workorder_detail"),
 
+    path("pwa/zlecenia/<int:pk>/protokol/", views_pwa.pwa_servicereport_entry, name="pwa_servicereport_entry"),
+    path("pwa/protokoly/serwis/<int:pk>/", views_pwa.pwa_servicereport_edit, name="pwa_servicereport_edit"),
+
     path("api/pwa/workorders/dump/", views_pwa.api_pwa_workorders_dump, name="api_pwa_workorders_dump"),
+    path("api/pwa/servicereport/save/", views_pwa.api_pwa_servicereport_save, name="api_pwa_servicereport_save"),
 
 
     path("pwa/sw.js", views_pwa.pwa_sw, name="pwa_sw"),

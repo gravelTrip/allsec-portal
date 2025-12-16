@@ -274,6 +274,40 @@ class ServiceReportForm(forms.ModelForm):
             ),
         }
 
+class ServiceReportPwaForm(forms.ModelForm):
+    """
+    Wersja PWA dla serwisanta – bez pól uzupełnianych przez biuro.
+    """
+    class ServiceReportPwaForm(forms.ModelForm):
+        report_date = forms.DateField(
+            required=False,
+            input_formats=["%Y-%m-%d", "%d.%m.%Y"],
+            widget=forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"type": "date", "class": "form-control"},
+            ),
+        )
+
+    class Meta:
+        model = ServiceReport
+        fields = [
+            "report_date",
+            "description_before",
+            "work_performed",
+            "technicians",
+            "notes_internal",
+        ]
+        widgets = {
+            "report_date": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"type": "date", "class": "form-control"},
+            ),
+            "description_before": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "work_performed": forms.Textarea(attrs={"class": "form-control", "rows": 6}),
+            "technicians": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "notes_internal": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+        }
+
 ServiceReportItemFormSet = inlineformset_factory(
     ServiceReport,
     ServiceReportItem,

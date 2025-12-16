@@ -1,15 +1,19 @@
+import json
+
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 
-from .models import WorkOrder
+from django.contrib import messages
 
-from django.http import JsonResponse, HttpRequest, HttpResponse
+from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
-from .models import Site, System, WorkOrder
+from .models import Site, System, WorkOrder, ServiceReport
+from .forms import ServiceReportForm, ServiceReportPwaForm
+from django.forms.models import model_to_dict
 
 from django.db.models import Case, When, Value, IntegerField 
 
@@ -21,12 +25,13 @@ def pwa_home(request):
     today = date.today()
 
     workorders_today = (
-    WorkOrder.objects
-    .select_related("site")
-    .prefetch_related("systems")
-    .filter(assigned_to=request.user, planned_date=today)
-    .order_by("planned_time_from", "planned_time_to", "id")
-)
+        WorkOrder.objects
+        .select_related("site")
+        .prefetch_related("systems")
+        .filter(assigned_to=request.user, planned_date=today)
+        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+        .order_by("planned_time_from", "planned_time_to", "id")
+    )
     workorders_today = _attach_workorder_system_badges(list(workorders_today))
 
     return render(
@@ -37,6 +42,7 @@ def pwa_home(request):
             "workorders_today": workorders_today,
         },
     )
+
 
 def _serialize_site(site: Site) -> dict:
     return {
@@ -96,6 +102,7 @@ def pwa_workorder_list(request):
         WorkOrder.objects
         .select_related("site")
         .filter(assigned_to=request.user)
+        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
         .prefetch_related("systems")
         .annotate(
             _no_date=Case(
@@ -109,12 +116,12 @@ def pwa_workorder_list(request):
 
     workorders = _attach_workorder_system_badges(list(workorders))
 
-
     return render(
         request,
         "pwa/workorder_list.html",
         {"workorders": workorders},
     )
+
 
 @require_GET
 @login_required
@@ -149,7 +156,7 @@ def pwa_objects(request):
 @require_GET
 def pwa_sw(request):
     js = r"""
-const CACHE_NAME = "allsec-pwa-shell-v3";
+const CACHE_NAME = "allsec-pwa-shell-v4";
 const SHELL_URLS = [
   "/pwa/",
   "/pwa/zlecenia/",
@@ -234,6 +241,17 @@ def api_pwa_workorders_dump(request):
         # badge z typów systemów (unikalne)
         seen = set()
         labels = []
+        sr_id = None
+        sr_number = None
+
+        # tylko dla SERWIS (żeby nie tworzyć śmieci dla innych typów)
+        if wo.work_type == WorkOrder.WorkOrderType.SERVICE:
+            sr, _created = ServiceReport.objects.get_or_create(
+                work_order=wo,
+                defaults={"created_by": request.user},
+            )
+            sr_id = sr.pk
+            sr_number = sr.number
         for s in wo.systems.all():
             k = getattr(s, "system_type", None)
             if not k or k in seen:
@@ -261,6 +279,8 @@ def api_pwa_workorders_dump(request):
             "description": wo.description,
             "site_id": site.id if site else None,
             "system_ids": [s.id for s in wo.systems.all()],
+            "service_report_id": sr_id,
+            "service_report_number": sr_number,
         })
 
     return JsonResponse({
@@ -275,4 +295,130 @@ def pwa_workorder_detail(request, pk: int):
         pk=pk,
         assigned_to=request.user,
     )
-    return render(request, "pwa/workorder_detail.html", {"wo": wo, "current_path": request.get_full_path()})
+    back = request.GET.get("back", "")
+    back_url = reverse("core:pwa_workorder_list")
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        back_url = back
+
+    sr = None
+    if wo.work_type == WorkOrder.WorkOrderType.SERVICE:
+        sr, _created = ServiceReport.objects.get_or_create(
+            work_order=wo,
+            defaults={"created_by": request.user},
+        )
+
+
+    return render(
+        request,
+        "pwa/workorder_detail.html",
+        {
+            "wo": wo,
+            "current_path": request.get_full_path(),
+            "back_url": back_url,
+            "sr": sr,
+            "sr_id": sr.pk if sr else None,
+        },
+    )
+@login_required
+def pwa_servicereport_entry(request, pk):
+    wo = get_object_or_404(WorkOrder, pk=pk)
+
+    # TODO: tu wstaw swoje zasady dostępu (np. assigned_to albo biuro)
+    # if not can_access_workorder(request.user, wo): ...
+
+    sr, created = ServiceReport.objects.get_or_create(
+        work_order=wo,
+        defaults={"created_by": request.user},
+    )
+    back = request.GET.get("back", "")
+    edit_url = reverse("core:pwa_servicereport_edit", args=[sr.pk])
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        edit_url = f"{edit_url}?back={back}"
+
+    return redirect(edit_url)
+
+
+@login_required
+def pwa_servicereport_edit(request, pk):
+    sr = get_object_or_404(ServiceReport, pk=pk)
+    wo = sr.work_order
+
+    # TODO: tu wstaw swoje zasady dostępu
+    # if not can_access_workorder(request.user, wo): ...
+
+    form = ServiceReportPwaForm(request.POST or None, instance=sr)
+
+    back = request.GET.get("back", "")
+    back_url = reverse("core:pwa_workorder_detail", args=[wo.pk])
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        back_url = back
+
+    if request.method == "POST":
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Zapisano protokół.")
+            return redirect(back_url)
+
+    return render(
+        request,
+        "pwa/servicereport_form_pwa.html",
+        {"sr": sr, "wo": wo, "form": form, "back_url": back_url},
+    )
+
+@require_POST
+@login_required
+def api_pwa_servicereport_save(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Bad JSON")
+
+    sr_id = payload.get("sr_id")
+    wo_id = payload.get("wo_id")
+    fields = payload.get("fields") or {}
+
+    if not sr_id or not isinstance(fields, dict):
+        return HttpResponseBadRequest("Missing sr_id/fields")
+
+    sr = get_object_or_404(ServiceReport.objects.select_related("work_order"), pk=sr_id)
+
+    # (opcjonalnie) sanity check
+    if wo_id and sr.work_order_id != int(wo_id):
+        return HttpResponseBadRequest("WorkOrder mismatch")
+
+    # Minimalna kontrola dostępu: serwisant przypisany do zlecenia albo staff/superuser
+    assigned_id = getattr(sr.work_order, "assigned_to_id", None)
+    if not (request.user.is_superuser or request.user.is_staff or assigned_id == request.user.id):
+        return HttpResponseForbidden("Not allowed")
+
+    # Whitelist pól = pola z formularza (czyli bez numeru/statusu itd.)
+    allowed = list(ServiceReportPwaForm().fields.keys())
+
+
+    # Merge obecnego stanu + incoming (żeby nie wywalać walidacji na brakujących polach)
+    base = model_to_dict(sr, fields=allowed)
+    for k, v in fields.items():
+        if k in allowed:
+            base[k] = v
+
+    form = ServiceReportPwaForm(data=base, instance=sr)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": form.errors}, status=400)
+
+    saved = form.save()
+    return JsonResponse({"ok": True, "sr_id": saved.pk, "updated_at": saved.updated_at.isoformat()})

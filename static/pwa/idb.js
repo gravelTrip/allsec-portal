@@ -2,14 +2,15 @@
 // Minimalny helper IndexedDB bez bibliotek zewnętrznych.
 
 const DB_NAME = "allsec_pwa";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function openDb() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
 
     req.onupgradeneeded = (event) => {
-      const db = req.result;
+      const db = event.target.result;
+      const oldVersion = event.oldVersion || 0;
 
       // sites: klucz id
       if (!db.objectStoreNames.contains("sites")) {
@@ -31,6 +32,19 @@ function openDb() {
       if (!db.objectStoreNames.contains("workorders")) {
         db.createObjectStore("workorders", { keyPath: "id" });
       }
+
+      if (oldVersion < 3) {
+        if (!db.objectStoreNames.contains("sr_drafts")) {
+          db.createObjectStore("sr_drafts", { keyPath: "sr_id" });
+        }
+        if (!db.objectStoreNames.contains("outbox")) {
+          const outbox = db.createObjectStore("outbox", { keyPath: "id", autoIncrement: true });
+          outbox.createIndex("kind", "kind", { unique: false });
+          outbox.createIndex("created_at", "created_at", { unique: false });
+        }
+      }
+
+      
     };
 
     req.onsuccess = () => resolve(req.result);
@@ -127,4 +141,52 @@ export async function getAllByIndex(storeName, indexName, key) {
 
   db.close();
   return result;
+}
+
+export async function putSrDraft(sr_id, payload) {
+  const db = await openDb();
+  const tx = db.transaction(["sr_drafts"], "readwrite");
+  tx.objectStore("sr_drafts").put({ sr_id, ...payload, saved_at: Date.now() });
+  await txDone(tx);
+  db.close();
+}
+
+export async function getSrDraft(sr_id) {
+  const db = await openDb();
+  const tx = db.transaction(["sr_drafts"], "readonly");
+  const req = tx.objectStore("sr_drafts").get(sr_id);
+  const result = await new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return result;
+}
+
+export async function enqueueOutbox(kind, payload) {
+  const db = await openDb();
+  const tx = db.transaction(["outbox"], "readwrite");
+  tx.objectStore("outbox").add({ kind, payload, created_at: Date.now() });
+  await txDone(tx);
+  db.close();
+}
+
+export async function listOutbox() {
+  const db = await openDb();
+  const tx = db.transaction(["outbox"], "readonly");
+  const req = tx.objectStore("outbox").getAll();
+  const result = await new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return result;
+}
+
+export async function deleteOutbox(id) {
+  const db = await openDb();
+  const tx = db.transaction(["outbox"], "readwrite");
+  tx.objectStore("outbox").delete(id);
+  await txDone(tx);
+  db.close();
 }
