@@ -169,18 +169,32 @@
 {# Przycisk protokołu przyklejony na dole #}
 <div class="fixed-bottom bg-white border-top">
     <div class="container-fluid py-2">
+
         {% if wo.work_type == "SERVICE" and sr_id %}
         <a class="btn btn-primary w-100 pwa-btn"
             href="{% url 'core:pwa_servicereport_edit' sr_id %}?back={{ current_path|urlencode }}">
             PROTOKÓŁ SERWISOWY
         </a>
+
         {% elif wo.work_type == "SERVICE" %}
-        {# awaryjnie (gdyby sr_id było puste) #}
         <a class="btn btn-primary w-100 pwa-btn"
             href="{% url 'core:pwa_servicereport_entry' wo.pk %}?back={{ current_path|urlencode }}">
             PROTOKÓŁ SERWISOWY
         </a>
+
+        {% elif wo.work_type == "MAINTENANCE" and mp_id %}
+        <a class="btn btn-primary w-100 pwa-btn"
+            href="{% url 'core:pwa_maintenanceprotocol_edit' mp_id %}?back={{ current_path|urlencode }}">
+            PROTOKÓŁ KONSERWACJI
+        </a>
+
+        {% elif wo.work_type == "MAINTENANCE" %}
+        <button class="btn btn-secondary w-100 pwa-btn" disabled>
+            PROTOKÓŁ KONSERWACJI (brak)
+        </button>
+
         {% endif %}
     </div>
 </div>
+
 {% endblock %}

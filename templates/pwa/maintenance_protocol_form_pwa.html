@@ -1,0 +1,139 @@
+{% extends "pwa/base_pwa.html" %}
+
+{% block title %}
+PWA – Protokół konserwacji
+{% endblock %}
+
+{% block content %}
+<div class="pwa-topbar bg-white border-bottom">
+    <div class="container-fluid py-2">
+        <div class="d-flex align-items-center justify-content-between gap-2">
+            <button type="button" class="btn btn-outline-primary pwa-btn" id="mpBackBtn">
+                ← Powrót
+            </button>
+
+            <div class="small text-end">
+                <div class="fw-semibold">
+                    {{ site.name }}
+                </div>
+                <div class="text-muted">
+                    {% if protocol.number %}Protokół: {{ protocol.number }}{% else %}Protokół: szkic{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid py-3" style="padding-bottom: 110px;">
+    <div class="card pwa-card">
+        <div class="card-body">
+
+            <form method="post" data-pwa-mp-form data-mp-id="{{ protocol.pk }}" data-wo-id="{{ work_order.pk }}"
+                data-back-url="{{ back_url }}">
+                {% csrf_token %}
+
+                {# ukryte pola – nie pokazujemy w UI, ale wysyłamy w POST #}
+                {{ form.next_period_month.as_hidden }}
+                {{ form.next_period_year.as_hidden }}
+                {{ form.status.as_hidden }}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2 small">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label fw-semibold small">Data wykonania</label>
+                        {{ form.date }}
+                        {{ form.date.errors }}
+                    </div>
+                </div>
+
+                <hr class="my-3">
+
+                {% for bundle in section_formsets %}
+                {% with section=bundle.section formset=bundle.formset %}
+                <div class="card pwa-card mb-3">
+                    <div class="card-body">
+                        <div class="fw-semibold">
+                            {{ section.header_name }}
+                            {% if section.manufacturer or section.model %}
+                            <span class="text-muted">– {{ section.manufacturer }} {{ section.model }}</span>
+                            {% endif %}
+                        </div>
+
+                        {% if section.location %}
+                        <div class="small text-muted mt-1">Lokalizacja: {{ section.location }}</div>
+                        {% endif %}
+
+                        {{ formset.management_form }}
+
+                        <div class="mt-3 d-grid gap-2">
+                            {% for item_form in formset %}
+                            <div class="border rounded p-2">
+                                {{ item_form.id }}
+
+                                <div class="row g-2">
+                                    {# LEWA: opis + pole tekstowe 1-liniowe (note) #}
+                                    <div class="col-8">
+                                        <div class="small fw-semibold mb-1">
+                                            {{ forloop.counter }}. {{ item_form.instance.label }}
+                                        </div>
+
+                                        <div>
+                                            {{ item_form.note }}
+                                            {{ item_form.note.errors }}
+                                        </div>
+                                    </div>
+
+                                    {# PRAWA: Wynik + select #}
+                                    <div class="col-4">
+                                        <div class="small fw-semibold mb-1">Wynik:</div>
+                                        {{ item_form.result }}
+                                        {{ item_form.result.errors }}
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-muted small">
+                                Brak punktów kontrolnych w tej sekcji.
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mt-3">
+                            <label class="form-label small fw-semibold">Uwagi (podsumowanie sekcji)</label>
+                            <textarea name="section_{{ section.pk }}_remarks" class="form-control"
+                                rows="3">{{ section.section_remarks|default_if_none:"" }}</textarea>
+                        </div>
+
+                    </div>
+                </div>
+                {% endwith %}
+                {% empty %}
+                <div class="text-muted small">Brak sekcji w protokole.</div>
+                {% endfor %}
+
+                <div class="fixed-bottom bg-white border-top">
+                    <div class="container-fluid py-2">
+                        <button type="submit" class="btn btn-dark w-100 pwa-btn">
+                            ZAPISZ
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script type="module">
+    import { initPwaMaintenanceProtocolForm } from "/static/pwa/pwa.js";
+    initPwaMaintenanceProtocolForm();
+</script>
+{% endblock %}

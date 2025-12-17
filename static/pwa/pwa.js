@@ -1,5 +1,10 @@
 // core/static/pwa/pwa.js
-import { clearStore, putMany, setMeta, getMeta, getAll, getByKey, putSrDraft, getSrDraft, enqueueOutbox, listOutbox, deleteOutbox } from "./idb.js";
+import {
+  clearStore, putMany, setMeta, getMeta, getAll, getByKey,
+  putSrDraft, getSrDraft,
+  putMpDraft, getMpDraft,
+  enqueueOutbox, listOutbox, deleteOutbox
+} from "./idb.js";
 
 function $(id) {
   return document.getElementById(id);
@@ -87,18 +92,19 @@ async function warmServiceReportPagesCache() {
   const cache = await caches.open(CACHE_NAME);
 
   const wos = await getAll("workorders");
-  
-  // Cache'owanie szczegółów protokołów
+
   const serviceReportUrls = (wos || [])
     .filter(w => w?.service_report_id)
     .map(w => `/pwa/protokoly/serwis/${w.service_report_id}/`);
 
-  // Cache'owanie szczegółów zleceń
+  const maintenanceUrls = (wos || [])
+    .filter(w => w?.maintenance_protocol_id)
+    .map(w => `/pwa/protokoly/konserwacja/${w.maintenance_protocol_id}/`);
+
   const workorderUrls = (wos || [])
     .map(w => `/pwa/zlecenia/${w.id}/`);
 
-  // Łączymy oba URL-e do cache'owania
-  const allUrls = [...serviceReportUrls, ...workorderUrls];
+  const allUrls = [...serviceReportUrls, ...maintenanceUrls, ...workorderUrls];
 
   for (const url of allUrls) {
     try {
@@ -109,6 +115,7 @@ async function warmServiceReportPagesCache() {
     }
   }
 }
+
 
 
 
@@ -333,20 +340,26 @@ async function renderWorkorderDetailOffline(woId) {
           : `<div class="alert alert-light border mb-0">Brak systemów w offline cache. Zrób SYNC.</div>`
         }
 
-                <div class="fixed-bottom bg-white border-top">
+        <div class="fixed-bottom bg-white border-top">
           <div class="container-fluid py-2">
             ${
-              wo.service_report_id
+              (wo.work_type === "SERVICE" && wo.service_report_id)
                 ? `<a class="btn btn-primary w-100 pwa-btn"
                       href="/pwa/protokoly/serwis/${wo.service_report_id}/">
-                      PROTOKÓŁ
+                      PROTOKÓŁ SERWISOWY
                    </a>`
-                : `<button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
-                      PROTOKÓŁ (zrób SYNC online)
-                   </button>`
+                : (wo.work_type === "MAINTENANCE" && wo.maintenance_protocol_id)
+                  ? `<a class="btn btn-primary w-100 pwa-btn"
+                        href="/pwa/protokoly/konserwacja/${wo.maintenance_protocol_id}/">
+                        PROTOKÓŁ KONSERWACJI
+                     </a>`
+                  : `<button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
+                        PROTOKÓŁ (zrób SYNC online)
+                     </button>`
             }
           </div>
         </div>
+
 
       </div>
     </div>
@@ -401,14 +414,14 @@ async function processOutbox() {
   const items = await listOutbox();
   if (!items.length) return;
 
-  // (prosto) przetwarzamy po kolei, jak coś padnie — zostawiamy resztę na później
   for (const item of items.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))) {
+
     if (item.kind === "servicereport_save") {
       const payload = item.payload || {};
       if (payload.fields?.report_date) {
         payload.fields.report_date = normalizeDateToIso(payload.fields.report_date);
       }
-    
+
       const resp = await fetch("/api/pwa/servicereport/save/", {
         method: "POST",
         headers: {
@@ -419,15 +432,34 @@ async function processOutbox() {
         credentials: "same-origin",
       });
 
-      if (!resp.ok) {
-        // nie kasujemy z kolejki — spróbujemy następnym razem
-        break;
+      if (!resp.ok) break;
+      await deleteOutbox(item.id);
+      continue;
+    }
+
+    if (item.kind === "maintenanceprotocol_save") {
+      const payload = item.payload || {};
+      if (payload.fields?.date) {
+        payload.fields.date = normalizeDateToIso(payload.fields.date);
       }
 
+      const resp = await fetch("/api/pwa/maintenanceprotocol/save/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCookie("csrftoken"),
+        },
+        body: JSON.stringify(payload),
+        credentials: "same-origin",
+      });
+
+      if (!resp.ok) break;
       await deleteOutbox(item.id);
+      continue;
     }
   }
 }
+
 
 function serializeForm(form) {
   const fd = new FormData(form);
@@ -616,3 +648,73 @@ export function initPwaServiceReportForm() {
 }
 
 
+export function initPwaMaintenanceProtocolForm() {
+  const form = document.querySelector("form[data-pwa-mp-form]");
+  if (!form) return;
+
+  const mpId = parseInt(form.dataset.mpId || "", 10);
+  const woId = parseInt(form.dataset.woId || "", 10);
+  const backUrl = form.dataset.backUrl || "/pwa/";
+  const backBtn = document.getElementById("mpBackBtn");
+
+  if (backBtn) {
+    backBtn.addEventListener("click", () => {
+      window.location.replace(backUrl);
+    });
+  }
+
+  if (!mpId) return;
+
+  // restore draft
+  getMpDraft(mpId).then((draft) => {
+    if (draft?.fields) applyFieldsToForm(form, draft.fields);
+  });
+
+  // autosave draft
+  let t = null;
+  const saveDraft = async () => {
+    const fields = serializeForm(form);
+    await putMpDraft(mpId, { wo_id: woId, fields });
+  };
+
+  const onChange = () => {
+    clearTimeout(t);
+    t = setTimeout(saveDraft, 500);
+  };
+
+  form.addEventListener("input", onChange);
+  form.addEventListener("change", onChange);
+
+  // submit intercept (pingServer decyduje)
+  let allowNativeSubmit = false;
+
+  form.addEventListener("submit", async (e) => {
+    if (allowNativeSubmit) return;
+
+    e.preventDefault();
+
+    if (typeof form.checkValidity === "function" && !form.checkValidity()) {
+      if (typeof form.reportValidity === "function") form.reportValidity();
+      return;
+    }
+
+    const ok = await pingServer(800);
+
+    if (ok) {
+      allowNativeSubmit = true;
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+      return;
+    }
+
+    // offline: draft + outbox
+    const fields = serializeForm(form);
+    await putMpDraft(mpId, { wo_id: woId, fields });
+    await enqueueOutbox("maintenanceprotocol_save", { mp_id: mpId, wo_id: woId, fields });
+
+    window.location.replace(backUrl);
+  });
+}

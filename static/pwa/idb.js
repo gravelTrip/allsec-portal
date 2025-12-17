@@ -2,7 +2,7 @@
 // Minimalny helper IndexedDB bez bibliotek zewnętrznych.
 
 const DB_NAME = "allsec_pwa";
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -12,23 +12,19 @@ function openDb() {
       const db = event.target.result;
       const oldVersion = event.oldVersion || 0;
 
-      // sites: klucz id
       if (!db.objectStoreNames.contains("sites")) {
         db.createObjectStore("sites", { keyPath: "id" });
       }
 
-      // systems: klucz id + index po site_id do szybkiego filtrowania
       if (!db.objectStoreNames.contains("systems")) {
         const store = db.createObjectStore("systems", { keyPath: "id" });
         store.createIndex("by_site_id", "site_id", { unique: false });
       }
 
-      // meta: na ustawienia / last_sync itp.
       if (!db.objectStoreNames.contains("meta")) {
         db.createObjectStore("meta", { keyPath: "key" });
       }
 
-      // workorders: klucz id
       if (!db.objectStoreNames.contains("workorders")) {
         db.createObjectStore("workorders", { keyPath: "id" });
       }
@@ -44,13 +40,18 @@ function openDb() {
         }
       }
 
-      
+      if (oldVersion < 4) {
+        if (!db.objectStoreNames.contains("mp_drafts")) {
+          db.createObjectStore("mp_drafts", { keyPath: "mp_id" });
+        }
+      }
     };
 
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
   });
 }
+
 
 function txDone(tx) {
   return new Promise((resolve, reject) => {
@@ -189,4 +190,24 @@ export async function deleteOutbox(id) {
   tx.objectStore("outbox").delete(id);
   await txDone(tx);
   db.close();
+}
+
+export async function putMpDraft(mp_id, payload) {
+  const db = await openDb();
+  const tx = db.transaction(["mp_drafts"], "readwrite");
+  tx.objectStore("mp_drafts").put({ mp_id, ...payload, saved_at: Date.now() });
+  await txDone(tx);
+  db.close();
+}
+
+export async function getMpDraft(mp_id) {
+  const db = await openDb();
+  const tx = db.transaction(["mp_drafts"], "readonly");
+  const req = tx.objectStore("mp_drafts").get(mp_id);
+  const result = await new Promise((resolve, reject) => {
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return result;
 }

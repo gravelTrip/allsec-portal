@@ -364,10 +364,11 @@ class MaintenanceCheckItemForm(forms.ModelForm):
                     "class": "form-select form-select-sm",
                 }
             ),
-            "note": forms.Textarea(
+            # 1-liniowe pole zamiast textarea
+            "note": forms.TextInput(
                 attrs={
                     "class": "form-control form-control-sm",
-                    "rows": 2,
+                    "placeholder": "",  # bez opisu (jak chcesz, mogę dać np. "Tekst własny…")
                 }
             ),
         }

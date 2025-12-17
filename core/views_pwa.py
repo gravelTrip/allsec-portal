@@ -11,8 +11,8 @@ from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseBad
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Site, System, WorkOrder, ServiceReport
-from .forms import ServiceReportForm, ServiceReportPwaForm
+from .models import Site, System, WorkOrder, ServiceReport, MaintenanceProtocol
+from .forms import ServiceReportForm, ServiceReportPwaForm, MaintenanceProtocolForm, MaintenanceCheckItemFormSet
 from django.forms.models import model_to_dict
 
 from django.db.models import Case, When, Value, IntegerField 
@@ -238,13 +238,18 @@ def api_pwa_workorders_dump(request):
     workorders = []
     for wo in qs:
         site = wo.site
+
         # badge z typów systemów (unikalne)
         seen = set()
         labels = []
+
         sr_id = None
         sr_number = None
 
-        # tylko dla SERWIS (żeby nie tworzyć śmieci dla innych typów)
+        mp_id = None
+        mp_number = None
+
+        # SERWIS: zapewniamy SR (jak było)
         if wo.work_type == WorkOrder.WorkOrderType.SERVICE:
             sr, _created = ServiceReport.objects.get_or_create(
                 work_order=wo,
@@ -252,6 +257,14 @@ def api_pwa_workorders_dump(request):
             )
             sr_id = sr.pk
             sr_number = sr.number
+
+        # KONSERWACJA: tylko odczyt (nie tworzymy tu “ciężkiej” struktury)
+        if wo.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
+            mp = MaintenanceProtocol.objects.filter(work_order=wo).first()
+            if mp:
+                mp_id = mp.pk
+                mp_number = mp.number
+
         for s in wo.systems.all():
             k = getattr(s, "system_type", None)
             if not k or k in seen:
@@ -264,6 +277,7 @@ def api_pwa_workorders_dump(request):
             "title": wo.title,
             "status_label": wo.get_status_display(),
             "work_type_label": wo.get_work_type_display(),
+            "work_type": wo.work_type,  # <— NOWE (kod: SERVICE/MAINTENANCE)
             "planned_date": wo.planned_date.isoformat() if wo.planned_date else None,
             "planned_time_from": wo.planned_time_from.strftime("%H:%M") if wo.planned_time_from else None,
             "planned_time_to": wo.planned_time_to.strftime("%H:%M") if wo.planned_time_to else None,
@@ -279,14 +293,19 @@ def api_pwa_workorders_dump(request):
             "description": wo.description,
             "site_id": site.id if site else None,
             "system_ids": [s.id for s in wo.systems.all()],
+
             "service_report_id": sr_id,
             "service_report_number": sr_number,
+
+            "maintenance_protocol_id": mp_id,          # <— NOWE
+            "maintenance_protocol_number": mp_number,  # <— NOWE
         })
 
     return JsonResponse({
         "generated_at": timezone.now().isoformat(),
         "workorders": workorders,
     })
+
 
 @login_required
 def pwa_workorder_detail(request, pk: int):
@@ -306,12 +325,19 @@ def pwa_workorder_detail(request, pk: int):
         back_url = back
 
     sr = None
+    sr_id = None
     if wo.work_type == WorkOrder.WorkOrderType.SERVICE:
         sr, _created = ServiceReport.objects.get_or_create(
             work_order=wo,
             defaults={"created_by": request.user},
         )
+        sr_id = sr.pk
 
+    mp = None
+    mp_id = None
+    if wo.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
+        mp = MaintenanceProtocol.objects.filter(work_order=wo).first()
+        mp_id = mp.pk if mp else None
 
     return render(
         request,
@@ -321,9 +347,13 @@ def pwa_workorder_detail(request, pk: int):
             "current_path": request.get_full_path(),
             "back_url": back_url,
             "sr": sr,
-            "sr_id": sr.pk if sr else None,
+            "sr_id": sr_id,
+            "mp": mp,
+            "mp_id": mp_id,
         },
     )
+
+
 @login_required
 def pwa_servicereport_entry(request, pk):
     wo = get_object_or_404(WorkOrder, pk=pk)
@@ -422,3 +452,223 @@ def api_pwa_servicereport_save(request):
 
     saved = form.save()
     return JsonResponse({"ok": True, "sr_id": saved.pk, "updated_at": saved.updated_at.isoformat()})
+
+@login_required
+def pwa_maintenanceprotocol_entry(request, pk):
+    wo = get_object_or_404(WorkOrder, pk=pk)
+
+    # dostęp jak w API SR: assigned_to albo staff/superuser
+    assigned_id = getattr(wo, "assigned_to_id", None)
+    if not (request.user.is_superuser or request.user.is_staff or assigned_id == request.user.id):
+        return HttpResponseForbidden("Not allowed")
+
+    if wo.work_type != WorkOrder.WorkOrderType.MAINTENANCE:
+        return HttpResponseForbidden("Protokół konserwacji tylko dla zleceń MAINTENANCE.")
+
+    protocol = MaintenanceProtocol.objects.filter(work_order=wo).first()
+
+    # jeśli jednak nie istnieje (stare zlecenia) — tworzymy jak w portalu
+    if protocol is None:
+        period_date = wo.planned_date or timezone.now().date()
+        period_year = period_date.year
+        period_month = period_date.month
+
+        next_year = None
+        next_month = None
+        if wo.site and hasattr(wo.site, "get_next_maintenance_period"):
+            next_year, next_month = wo.site.get_next_maintenance_period(
+                from_year=period_year,
+                from_month=period_month,
+            )
+
+        protocol = MaintenanceProtocol.objects.create(
+            work_order=wo,
+            site=wo.site,
+            period_year=period_year,
+            period_month=period_month,
+            next_period_year=next_year,
+            next_period_month=next_month,
+        )
+
+        if hasattr(protocol, "assign_number_if_needed"):
+            protocol.assign_number_if_needed()
+        if hasattr(protocol, "initialize_sections_from_previous_or_default"):
+            protocol.initialize_sections_from_previous_or_default()
+
+    back = request.GET.get("back", "")
+    edit_url = reverse("core:pwa_maintenanceprotocol_edit", args=[protocol.pk])
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        edit_url = f"{edit_url}?back={back}"
+
+    return redirect(edit_url)
+
+@login_required
+def pwa_maintenanceprotocol_edit(request, pk):
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("site", "work_order"),
+        pk=pk,
+    )
+    work_order = protocol.work_order
+    site = protocol.site
+
+    assigned_id = getattr(work_order, "assigned_to_id", None)
+    if not (request.user.is_superuser or request.user.is_staff or assigned_id == request.user.id):
+        return HttpResponseForbidden("Not allowed")
+
+    sections_qs = protocol.sections.all().prefetch_related("check_items")
+
+    back = request.GET.get("back", "")
+    back_url = reverse("core:pwa_workorder_detail", args=[work_order.pk])
+
+    if back and url_has_allowed_host_and_scheme(
+        back,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        back_url = back
+
+    if request.method == "POST":
+        form = MaintenanceProtocolForm(request.POST, instance=protocol)
+
+        section_formsets = []
+        is_valid = form.is_valid()
+
+        for section in sections_qs:
+            formset = MaintenanceCheckItemFormSet(
+                request.POST,
+                queryset=section.check_items.all(),
+                prefix=f"section-{section.pk}",
+            )
+            section_formsets.append({"section": section, "formset": formset})
+            if not formset.is_valid():
+                is_valid = False
+
+        if is_valid:
+            form.save()
+
+            for bundle in section_formsets:
+                section = bundle["section"]
+                remarks_field = f"section_{section.pk}_remarks"
+                new_remarks = (request.POST.get(remarks_field) or "").strip()
+
+                if new_remarks != (section.section_remarks or ""):
+                    section.section_remarks = new_remarks
+                    section.save(update_fields=["section_remarks"])
+
+                bundle["formset"].save()
+
+            messages.success(request, "Zapisano protokół konserwacji.")
+            return redirect(back_url)
+
+    else:
+        form = MaintenanceProtocolForm(instance=protocol)
+
+        section_formsets = []
+        for section in sections_qs:
+            formset = MaintenanceCheckItemFormSet(
+                queryset=section.check_items.all(),
+                prefix=f"section-{section.pk}",
+            )
+            section_formsets.append({"section": section, "formset": formset})
+
+    return render(
+        request,
+        "pwa/maintenance_protocol_form_pwa.html",
+        {
+            "protocol": protocol,
+            "site": site,
+            "work_order": work_order,
+            "form": form,
+            "section_formsets": section_formsets,
+            "back_url": back_url,
+        },
+    )
+
+@require_POST
+@login_required
+def api_pwa_maintenanceprotocol_save(request):
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest("Bad JSON")
+
+    mp_id = payload.get("mp_id")
+    wo_id = payload.get("wo_id")
+    fields = payload.get("fields") or {}
+
+    if not mp_id or not isinstance(fields, dict):
+        return HttpResponseBadRequest("Missing mp_id/fields")
+
+    protocol = get_object_or_404(
+        MaintenanceProtocol.objects.select_related("work_order", "site"),
+        pk=mp_id,
+    )
+
+    if wo_id and protocol.work_order_id != int(wo_id):
+        return HttpResponseBadRequest("WorkOrder mismatch")
+
+    assigned_id = getattr(protocol.work_order, "assigned_to_id", None)
+    if not (request.user.is_superuser or request.user.is_staff or assigned_id == request.user.id):
+        return HttpResponseForbidden("Not allowed")
+
+    # data: pola protokołu + formsety (extra klucze są OK — formy je ignorują)
+    data = dict(fields)
+
+    allowed = list(MaintenanceProtocolForm().fields.keys())
+    base = model_to_dict(protocol, fields=allowed)
+    for k in allowed:
+        if k not in data:
+            data[k] = base.get(k)
+
+    form = MaintenanceProtocolForm(data=data, instance=protocol)
+
+    sections_qs = protocol.sections.all().prefetch_related("check_items")
+    bundles = []
+    is_valid = form.is_valid()
+
+    for section in sections_qs:
+        fs = MaintenanceCheckItemFormSet(
+            data=data,
+            queryset=section.check_items.all(),
+            prefix=f"section-{section.pk}",
+        )
+        bundles.append((section, fs))
+        if not fs.is_valid():
+            is_valid = False
+
+    if not is_valid:
+        return JsonResponse(
+            {
+                "ok": False,
+                "form_errors": form.errors,
+                "section_errors": [
+                    {"section_id": s.pk, "errors": fs.errors, "non_form_errors": fs.non_form_errors()}
+                    for (s, fs) in bundles
+                    if (fs.errors or fs.non_form_errors())
+                ],
+            },
+            status=400,
+        )
+
+    saved = form.save()
+
+    for (section, fs) in bundles:
+        remarks = (data.get(f"section_{section.pk}_remarks") or "").strip()
+        if remarks != (section.section_remarks or ""):
+            section.section_remarks = remarks
+            section.save(update_fields=["section_remarks"])
+        fs.save()
+
+    updated_at = getattr(saved, "updated_at", None)
+    return JsonResponse(
+        {
+            "ok": True,
+            "mp_id": saved.pk,
+            "updated_at": updated_at.isoformat() if updated_at else None,
+        }
+    )
