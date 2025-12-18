@@ -1,13 +1,18 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
+from django.contrib import messages
 from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import date, timedelta
 from django.http import HttpResponseForbidden, JsonResponse
 from django.db.models import Sum
 
+from django.urls import reverse
+
 from django.views.decorators.clickjacking import xframe_options_sameorigin
+from django.views.decorators.http import require_POST
+
 
 
 from django.conf import settings
@@ -23,6 +28,7 @@ from .models import (
     SiteContact,
     Entity,
     MaintenanceProtocol,
+    WorkOrderEvent
 )
 
 from .forms import (
@@ -368,10 +374,9 @@ def workorder_list(request):
         WorkOrder.objects
         .select_related("site", "assigned_to")
         .prefetch_related("systems")
-        .order_by("-created_at")  # albo inne sortowanie, które już masz
+        .order_by("-created_at")
     )
 
-    # wartości z filtrów (z formularza w template)
     filter_work_type = request.GET.get("work_type", "")
     filter_status = request.GET.get("status", "")
     show_closed = request.GET.get("show_closed") == "on"
@@ -380,22 +385,25 @@ def workorder_list(request):
         qs = qs.filter(work_type=filter_work_type)
 
     if filter_status:
-        # jeśli użytkownik wybrał konkretny status, pokazujemy dokładnie ten
         qs = qs.filter(status=filter_status)
     else:
-        # jeśli NIE wybrano konkretnego statusu i checkbox nie zaznaczony,
-        # ukrywamy Zakończone i Odwołane
         if not show_closed:
-            qs = qs.exclude(
-                status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED]
-            )
+            qs = qs.exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
 
-    paginator = Paginator(qs, 20)
+    paginator = Paginator(qs, 30)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
     work_type_choices = [("", "Typ: wszystkie")] + list(WorkOrder.WorkOrderType.choices)
     status_choices = [("", "Status: wszystkie")] + list(WorkOrder.Status.choices)
+
+    unread_events_count = 0
+    recent_events = []
+    if is_office(request.user):
+        unread_events_count = WorkOrderEvent.objects.filter(is_read=False).count()
+        recent_events = list(
+            WorkOrderEvent.objects.select_related("work_order", "actor")[:10]
+        )
 
     context = {
         "orders": page_obj.object_list,
@@ -407,8 +415,14 @@ def workorder_list(request):
         "filter_status": filter_status,
         "show_closed": show_closed,
         "can_create": is_office(request.user),
+
+        "unread_events_count": unread_events_count,
+        "recent_events": recent_events,
     }
     return render(request, "core/workorder_list.html", context)
+
+
+
 
 
 @login_required
@@ -1530,3 +1544,54 @@ def maintenance_protocol_delete(request, pk):
     # GET -> wróć na szczegóły
     return redirect("core:maintenance_protocol_detail", pk=pk)
 
+@require_POST
+@login_required
+def workorder_toggle_realized(request, pk):
+    wo = get_object_or_404(WorkOrder, pk=pk)
+
+    # Dostęp: biuro może zawsze, serwisant tylko gdy przypisane do niego
+    if not is_office(request.user):
+        if wo.assigned_to_id != request.user.id:
+            return JsonResponse({"ok": False, "error": "Brak dostępu."}, status=403)
+
+    # Toggle: Realizacja <-> Zrealizowane
+    if wo.status == WorkOrder.Status.REALIZED:
+        wo.status = WorkOrder.Status.IN_PROGRESS
+        wo.save(update_fields=["status"])
+        messages.success(request, "Status zmieniony na: Realizacja")
+        new_label = "Realizacja"
+        new_code = WorkOrder.Status.IN_PROGRESS
+    else:
+        wo.status = WorkOrder.Status.REALIZED
+        wo.save(update_fields=["status"])
+        messages.success(request, "Status zmieniony na: Zrealizowane")
+        new_label = "Zrealizowane"
+        new_code = WorkOrder.Status.REALIZED
+
+    # Jeśli PWA/JS odpytuje fetch-em – oddaj JSON (żeby nie robić redirectów)
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JsonResponse({"ok": True, "status": new_code, "status_label": new_label})
+
+    # Normalny portal – wróć tam skąd przyszło
+    back = request.POST.get("back") or request.META.get("HTTP_REFERER") or reverse("core:workorder_detail", args=[wo.pk])
+    return redirect(back)
+
+
+@login_required
+def workorder_events(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Tylko biuro")
+
+    qs = WorkOrderEvent.objects.select_related("work_order", "actor")
+    return render(request, "core/workorder_events.html", {"events": qs[:200]})
+    
+
+@login_required
+@require_POST
+def workorder_events_mark_all_read(request):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Tylko biuro")
+
+    WorkOrderEvent.objects.filter(is_read=False).update(is_read=True)
+    messages.success(request, "Oznaczono wszystkie powiadomienia jako przeczytane.")
+    return redirect("core:workorder_events")

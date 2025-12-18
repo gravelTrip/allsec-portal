@@ -1,5 +1,6 @@
 import json
 
+
 from datetime import date
 
 from django.contrib.auth.decorators import login_required
@@ -11,7 +12,7 @@ from django.http import JsonResponse, HttpRequest, HttpResponse, HttpResponseBad
 from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
-from .models import Site, System, WorkOrder, ServiceReport, MaintenanceProtocol
+from .models import Site, System, WorkOrder, ServiceReport, MaintenanceProtocol, WorkOrderEvent
 from .forms import ServiceReportForm, ServiceReportPwaForm, MaintenanceProtocolForm, MaintenanceCheckItemFormSet
 from django.forms.models import model_to_dict
 
@@ -19,6 +20,16 @@ from django.db.models import Case, When, Value, IntegerField
 
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+
+def is_office(user):
+    """Użytkownik biura: pełne prawa.
+    - superuser
+    - lub należy do grupy 'office'
+    """
+    if not user.is_authenticated:
+        return False
+    return user.is_superuser or user.groups.filter(name="office").exists()
+
 
 @login_required
 def pwa_home(request):
@@ -28,10 +39,14 @@ def pwa_home(request):
         WorkOrder.objects
         .select_related("site")
         .prefetch_related("systems")
-        .filter(assigned_to=request.user, planned_date=today)
-        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+        .filter(
+            assigned_to=request.user,
+            planned_date=today,
+            status__in=[WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.REALIZED],
+        )
         .order_by("planned_time_from", "planned_time_to", "id")
     )
+
     workorders_today = _attach_workorder_system_badges(list(workorders_today))
 
     return render(
@@ -42,6 +57,7 @@ def pwa_home(request):
             "workorders_today": workorders_today,
         },
     )
+
 
 
 def _serialize_site(site: Site) -> dict:
@@ -98,28 +114,25 @@ def _attach_workorder_system_badges(workorders):
 
 @login_required
 def pwa_workorder_list(request):
-    workorders = (
+    qs = (
         WorkOrder.objects
         .select_related("site")
-        .filter(assigned_to=request.user)
-        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
         .prefetch_related("systems")
-        .annotate(
-            _no_date=Case(
-                When(planned_date__isnull=True, then=Value(1)),
-                default=Value(0),
-                output_field=IntegerField(),
-            )
+        .filter(
+            assigned_to=request.user,
+            status__in=[WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.REALIZED],
         )
-        .order_by("_no_date", "planned_date", "planned_time_from", "planned_time_to", "id")
+        .order_by("planned_date", "planned_time_from", "id")
     )
 
-    workorders = _attach_workorder_system_badges(list(workorders))
+    workorders = _attach_workorder_system_badges(list(qs))
 
     return render(
         request,
         "pwa/workorder_list.html",
-        {"workorders": workorders},
+        {
+            "workorders": workorders,
+        },
     )
 
 
@@ -156,7 +169,7 @@ def pwa_objects(request):
 @require_GET
 def pwa_sw(request):
     js = r"""
-const CACHE_NAME = "allsec-pwa-shell-v4";
+const CACHE_NAME = "allsec-pwa-shell-v5";
 const SHELL_URLS = [
   "/pwa/",
   "/pwa/zlecenia/",
@@ -219,92 +232,78 @@ self.addEventListener("fetch", (event) => {
 def api_pwa_ping(request):
     return JsonResponse({"ok": True, "server_time": timezone.now().isoformat()})
 
+@require_GET
 @login_required
 def api_pwa_workorders_dump(request):
     user = request.user
 
     qs = (
-        WorkOrder.objects
-        .select_related("site")
+        WorkOrder.objects.select_related("site", "assigned_to")
         .prefetch_related("systems")
-        .filter(assigned_to=user)
-        .exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+        .filter(assigned_to=request.user)
+        .filter(status__in=[WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.REALIZED])
         .order_by("planned_date", "planned_time_from", "id")
-    )
+)
 
-    # mapowanie choices system_type -> label
     type_labels = dict(System._meta.get_field("system_type").choices)
 
     workorders = []
     for wo in qs:
         site = wo.site
 
-        # badge z typów systemów (unikalne)
         seen = set()
         labels = []
 
         sr_id = None
         sr_number = None
-
-        mp_id = None
-        mp_number = None
-
-        # SERWIS: zapewniamy SR (jak było)
         if wo.work_type == WorkOrder.WorkOrderType.SERVICE:
-            sr, _created = ServiceReport.objects.get_or_create(
-                work_order=wo,
-                defaults={"created_by": request.user},
-            )
-            sr_id = sr.pk
+            sr, _created = ServiceReport.objects.get_or_create(work_order=wo)
+            sr_id = sr.id
             sr_number = sr.number
 
-        # KONSERWACJA: tylko odczyt (nie tworzymy tu “ciężkiej” struktury)
-        if wo.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
-            mp = MaintenanceProtocol.objects.filter(work_order=wo).first()
-            if mp:
-                mp_id = mp.pk
-                mp_number = mp.number
-
         for s in wo.systems.all():
-            k = getattr(s, "system_type", None)
-            if not k or k in seen:
+            k = s.system_type
+            if k in seen:
                 continue
             seen.add(k)
-            labels.append(type_labels.get(k, str(k)))
+            labels.append(type_labels.get(k, k))
 
         workorders.append({
             "id": wo.id,
             "title": wo.title,
+
+            "status_code": wo.status,
             "status_label": wo.get_status_display(),
+
             "work_type_label": wo.get_work_type_display(),
-            "work_type": wo.work_type,  # <— NOWE (kod: SERVICE/MAINTENANCE)
             "planned_date": wo.planned_date.isoformat() if wo.planned_date else None,
             "planned_time_from": wo.planned_time_from.strftime("%H:%M") if wo.planned_time_from else None,
             "planned_time_to": wo.planned_time_to.strftime("%H:%M") if wo.planned_time_to else None,
+
+            "updated_at": wo.updated_at.isoformat() if getattr(wo, "updated_at", None) else None,
+
             "site": {
                 "id": site.id if site else None,
                 "name": site.name if site else None,
                 "street": site.street if site else None,
                 "city": site.city if site else None,
             },
+
             "system_badges": labels[:4],
             "system_badges_more": max(0, len(labels) - 4),
+
             "number": wo.number,
             "description": wo.description,
             "site_id": site.id if site else None,
+
             "system_ids": [s.id for s in wo.systems.all()],
 
             "service_report_id": sr_id,
             "service_report_number": sr_number,
-
-            "maintenance_protocol_id": mp_id,          # <— NOWE
-            "maintenance_protocol_number": mp_number,  # <— NOWE
         })
 
-    return JsonResponse({
-        "generated_at": timezone.now().isoformat(),
-        "workorders": workorders,
-    })
+    return JsonResponse({"workorders": workorders})
+
 
 
 @login_required
@@ -672,3 +671,45 @@ def api_pwa_maintenanceprotocol_save(request):
             "updated_at": updated_at.isoformat() if updated_at else None,
         }
     )
+
+@require_POST
+@login_required
+def api_pwa_workorder_set_status(request, pk: int):
+    wo = get_object_or_404(WorkOrder, pk=pk)
+
+    # tylko biuro albo przypisany serwisant
+    if not (is_office(request.user) or wo.assigned_to_id == request.user.id):
+        return HttpResponseForbidden("Brak uprawnień")
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        return HttpResponseBadRequest("Niepoprawny JSON")
+
+    new_status = payload.get("status")
+    allowed = {WorkOrder.Status.IN_PROGRESS, WorkOrder.Status.REALIZED}
+    if new_status not in allowed:
+        return HttpResponseBadRequest("Niedozwolony status")
+
+    old_status = wo.status
+    if old_status != new_status:
+        wo.status = new_status
+        wo.save(update_fields=["status", "updated_at"])
+
+        # powiadomienie dla biura tylko gdy zmiana od serwisanta (nie biuro)
+        if not is_office(request.user):
+            WorkOrderEvent.objects.create(
+                work_order=wo,
+                actor=request.user,
+                kind=WorkOrderEvent.Kind.STATUS_CHANGE,
+                old_status=old_status,
+                new_status=new_status,
+                source="PWA",
+                is_read=False,
+            )
+
+    return JsonResponse({
+        "id": wo.id,
+        "status_code": wo.status,
+        "status_label": wo.get_status_display(),
+    })

@@ -19,11 +19,13 @@
         </div>
 
         <div class="d-flex gap-2 mt-2">
-            <a class="btn btn-primary w-50 pwa-btn" href="{% url 'core:pwa_workorder_list' %}">ZLECENIA</a>
-
+            <a class="btn btn-primary w-50 pwa-btn d-flex justify-content-center align-items-center gap-2"
+                id="workordersBtn" href="{% url 'core:pwa_workorder_list' %}">
+                ZLECENIA
+                <span id="woNotifBadge" class="badge text-bg-warning" style="display:none;">0</span>
+            </a>
 
             <a class="btn btn-outline-primary w-50 pwa-btn" href="{% url 'core:pwa_objects' %}">OBIEKTY</a>
-
         </div>
     </div>
 </div>

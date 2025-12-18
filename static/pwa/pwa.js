@@ -68,6 +68,9 @@ async function syncCatalog() {
 }
 
 async function syncWorkorders() {
+  const prev = await getAll("workorders");
+  const prevMap = new Map((prev || []).map(w => [w.id, w]));
+
   const resp = await fetch("/api/pwa/workorders/dump/", {
     method: "GET",
     headers: { "Accept": "application/json" },
@@ -77,18 +80,33 @@ async function syncWorkorders() {
   if (!resp.ok) throw new Error(`WORKORDERS HTTP ${resp.status}`);
   const data = await resp.json();
 
-  await clearStore("workorders");
-  await putMany("workorders", data.workorders || []);
+  const incoming = data.workorders || [];
 
-  return { workorders: data.workorders?.length || 0 };
+  // policz "nowe do realizacji" (IN_PROGRESS) względem poprzedniego stanu cache
+  let newOnes = 0;
+  for (const w of incoming) {
+    if (w?.status_code !== "IN_PROGRESS") continue;
+    const old = prevMap.get(w.id);
+    if (!old || old.status_code !== "IN_PROGRESS") newOnes += 1;
+  }
+
+  const oldCount = Number(await getMeta("wo_notif_count") || 0);
+  const nextCount = oldCount + newOnes;
+  await setMeta("wo_notif_count", String(nextCount));
+
+  await clearStore("workorders");
+  await putMany("workorders", incoming);
+
+  return { workorders: incoming.length || 0 };
 }
+
 
 let syncInProgress = false;
 
 async function warmServiceReportPagesCache() {
   if (!("caches" in window)) return;
 
-  const CACHE_NAME = "allsec-pwa-shell-v4";
+  const CACHE_NAME = "allsec-pwa-shell-v5";
   const cache = await caches.open(CACHE_NAME);
 
   const wos = await getAll("workorders");
@@ -162,8 +180,47 @@ export function initPwaHome() {
   updateOnlineUI();
   loadLastSync();
 
+  // ===== badge: licznik "nowe do realizacji" =====
+  const updateWoBadge = async () => {
+    const badge = $("woNotifBadge");
+    if (!badge) return;
+
+    const raw = await getMeta("wo_notif_count");
+    const n = Number(raw || 0);
+
+    if (n > 0) {
+      badge.textContent = String(n);
+      badge.style.display = "inline-block";
+    } else {
+      badge.textContent = "0";
+      badge.style.display = "none";
+    }
+  };
+
+  // pokaż badge od razu po wejściu na HOME
+  updateWoBadge();
+
   const btn = $("syncBtn");
-  if (btn) btn.addEventListener("click", () => doSyncAll({ silent: false }));
+  if (btn) {
+    btn.addEventListener("click", async () => {
+      await doSyncAll({ silent: false });
+      await updateWoBadge();
+    });
+  }
+
+  // klik w "ZLECENIA" -> zeruj licznik i dopiero przejdź na listę
+  const woBtn = $("workordersBtn");
+  if (woBtn) {
+    woBtn.addEventListener("click", async (e) => {
+      const href = woBtn.getAttribute("href") || "/pwa/zlecenia/";
+      e.preventDefault();
+
+      await setMeta("wo_notif_count", "0");
+      await updateWoBadge();
+
+      window.location.href = href;
+    });
+  }
 
   // ping co 10s + po powrocie na kartę
   setInterval(updateOnlineUI, 10000);
@@ -184,11 +241,15 @@ export function initPwaHome() {
     if (!tooOld) return;
 
     await doSyncAll({ silent: true });
+    await updateWoBadge();
   }, 60 * 1000); // sprawdzaj co minutę, sync max co 5 min
 
   initPwaWorkordersUi();
+  
+ 
 
 }
+
 
 function esc(s) {
   return String(s ?? "")
@@ -264,72 +325,48 @@ async function renderWorkorderDetailOffline(woId) {
     systems = arr;
   }
 
-  const siteLine = site
-    ? `${esc(site.name)}${(site.street || site.city) ? " - " : ""}${esc(site.street || "")}${site.city ? " " + esc(site.city) : ""}`
-    : (wo.site?.name ? esc(wo.site.name) : "Brak obiektu");
-
-  const timeLine = `${wo.planned_time_from || ""}${wo.planned_time_to ? "–" + wo.planned_time_to : ""}`;
+  const toggleLabel = (wo.status_code === "REALIZED") ? "PRZYWRÓĆ" : "ZREALIZUJ";
+  const toggleBtnClass = (wo.status_code === "REALIZED") ? "btn-secondary" : "btn-success";
+  const nextStatus = (wo.status_code === "REALIZED") ? "IN_PROGRESS" : "REALIZED";
 
   container.innerHTML = `
     <div class="card pwa-card">
       <div class="card-body">
-        <div class="d-flex align-items-center gap-2 mb-2">
-          <button type="button"
-                  class="btn btn-primary pwa-btn"
-                  data-pwa-back
-                  data-fallback="/pwa/zlecenia/">
-            ← Powrót
-          </button>
-          <div class="small text-truncate">
-            <div class="fw-semibold">
-              Zlecenie ${esc(wo.work_type_label || "")}
-              ${wo.number ? esc(wo.number) : ""}
-              ${wo.planned_date ? " z " + esc(wo.planned_date.split("-").reverse().join(".")) : ""}
-            </div>
-          </div>
-        </div>
-
         <div class="fw-semibold mb-1">${esc(wo.title || "")}</div>
 
         <div class="small pwa-muted mb-2">
           <div>Status: ${esc(wo.status_label || "")}</div>
           <div>Typ: ${esc(wo.work_type_label || "")}</div>
           ${wo.planned_date ? `<div>Termin: ${esc(wo.planned_date.split("-").reverse().join("."))}</div>` : ""}
-          ${(wo.planned_time_from || wo.planned_time_to) ? `<div>Godzina: ${esc(timeLine)}</div>` : ""}
+          ${wo.planned_time_from || wo.planned_time_to ? `<div>Godzina: ${esc(wo.planned_time_from || "")}${wo.planned_time_to ? "– " + esc(wo.planned_time_to) : ""}</div>` : ""}
         </div>
 
         <hr>
 
-        <div class="fw-semibold mb-1">Obiekt</div>
-        <div class="mb-2">${siteLine}</div>
-
-        ${site?.access_info ? `
-          <div class="mt-2">
-            <div class="fw-semibold small">Dostępy / informacje</div>
-            <div class="small">${nl2br(site.access_info)}</div>
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div class="flex-grow-1">
+            <div class="fw-semibold mb-1">Obiekt</div>
+            ${
+              site
+                ? `<div class="mb-2">
+                    ${esc(site.name || "")}<br>
+                    <span class="small pwa-muted">${esc(site.street || "")}${site.city ? ", " + esc(site.city) : ""}</span>
+                  </div>`
+                : `<div class="alert alert-light border mb-2">Brak przypisanego obiektu.</div>`
+            }
           </div>
-        ` : ""}
+        </div>
 
-        ${wo.description ? `
-          <hr>
-          <div class="fw-semibold mb-1">Opis</div>
-          <div class="small">${nl2br(wo.description)}</div>
-        ` : ""}
+        ${wo.description ? `<hr><div class="fw-semibold mb-1">Opis</div><div class="small" style="white-space: pre-wrap;">${esc(wo.description)}</div>` : ""}
 
         <hr>
         <div class="fw-semibold mb-2">Systemy w zleceniu</div>
-
         ${
           systems.length
           ? systems.map(s => `
-              <details class="card pwa-card mb-2">
-                <summary class="card-body py-2" style="cursor:pointer;">
-                  <span class="badge text-bg-info me-1">${esc(s.system_type || "")}</span>
-                  <span class="fw-semibold">${esc((s.manufacturer || "") + " " + (s.model || "")).trim() || esc(s.name || "—")}</span>
-                </summary>
-                <div class="card-body small pt-0">
-                  <div><span class="fw-semibold">Producent:</span> ${esc(s.manufacturer || "—")}</div>
-                  <div><span class="fw-semibold">Model / typ:</span> ${esc(s.model || "—")}</div>
+              <details class="mb-2">
+                <summary><span class="badge text-bg-info me-1">${esc(s.system_type_label || s.system_type || "")}</span> <span class="fw-semibold">${esc((s.manufacturer || "") + " " + (s.model || "")).trim() || "—"}</span></summary>
+                <div class="small mt-2">
                   ${s.location_info ? `<div class="mt-2"><span class="fw-semibold">Lokalizacja:</span><br>${nl2br(s.location_info)}</div>` : ""}
                   ${s.access_data ? `<div class="mt-2"><span class="fw-semibold">Dostępy:</span><br>${nl2br(s.access_data)}</div>` : ""}
                   ${s.procedures ? `<div class="mt-2"><span class="fw-semibold">Procedury:</span><br>${nl2br(s.procedures)}</div>` : ""}
@@ -342,24 +379,27 @@ async function renderWorkorderDetailOffline(woId) {
 
         <div class="fixed-bottom bg-white border-top">
           <div class="container-fluid py-2">
-            ${
-              (wo.work_type === "SERVICE" && wo.service_report_id)
-                ? `<a class="btn btn-primary w-100 pwa-btn"
-                      href="/pwa/protokoly/serwis/${wo.service_report_id}/">
-                      PROTOKÓŁ SERWISOWY
-                   </a>`
-                : (wo.work_type === "MAINTENANCE" && wo.maintenance_protocol_id)
-                  ? `<a class="btn btn-primary w-100 pwa-btn"
-                        href="/pwa/protokoly/konserwacja/${wo.maintenance_protocol_id}/">
-                        PROTOKÓŁ KONSERWACJI
-                     </a>`
-                  : `<button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>
-                        PROTOKÓŁ (zrób SYNC online)
-                     </button>`
-            }
+            <div class="d-flex gap-2">
+              <div class="flex-grow-1">
+                ${
+                  wo.service_report_id
+                    ? `<a class="btn btn-primary w-100 pwa-btn" href="/pwa/protokoly/serwis/${wo.service_report_id}/">PROTOKÓŁ</a>`
+                    : `<button class="btn btn-secondary w-100 pwa-btn" type="button" disabled>PROTOKÓŁ (zrób SYNC online)</button>`
+                }
+              </div>
+
+              <div style="width: 160px;">
+                <button
+                  class="btn ${toggleBtnClass} w-100 pwa-btn"
+                  type="button"
+                  data-wo-status-toggle
+                  data-wo-id="${wo.id}"
+                  data-next-status="${nextStatus}"
+                >${toggleLabel}</button>
+              </div>
+            </div>
           </div>
         </div>
-
 
       </div>
     </div>
@@ -367,19 +407,25 @@ async function renderWorkorderDetailOffline(woId) {
 }
 
 
+
 export async function initPwaWorkordersUi() {
   const woId = getWorkorderIdFromPath();
 
   const ok = await pingServer(800);
+
+  // jeśli jesteśmy na detailu zlecenia i offline -> podmień HTML offline
   if (!ok && woId) {
     await renderWorkorderDetailOffline(woId);
-    return;
   }
+
+  // zawsze podepnij obsługę przycisku ZREALIZUJ/PRZYWRÓĆ (online i offline)
+  bindWorkorderStatusToggle();
 
   const nodes = document.querySelectorAll("[data-pwa-workorders]");
   if (!nodes.length) return;
 
-  if (ok) return; // online: zostaw server-render
+  // online: zostaw server-render listy
+  if (ok) return;
 
   const all = await getAll("workorders");
 
@@ -387,25 +433,32 @@ export async function initPwaWorkordersUi() {
     const mode = node.dataset.mode || "all";
     let items = all.slice();
 
+    // filtr PWA: tylko REALIZACJA + ZREALIZOWANE
+    items = items.filter(w => ["IN_PROGRESS", "REALIZED"].includes(w.status_code));
+
     if (mode === "today") {
       const todayIso = node.dataset.todayIso;
       if (todayIso) items = items.filter(w => w.planned_date === todayIso);
     }
 
-    // sort: data + godzina
     items.sort((a, b) => (a.planned_time_from || "").localeCompare(b.planned_time_from || ""));
 
     node.innerHTML = items.length
       ? items.map(renderWorkorderCard).join("")
-      : `<div class="alert alert-light border">Brak zleceń offline. Zrób SYNC.</div>`;
+      : `<div class="alert alert-light border">Brak zleceń w offline cache. Zrób SYNC.</div>`;
   }
 }
+
 
 function getCookie(name) {
   const v = `; ${document.cookie}`;
   const parts = v.split(`; ${name}=`);
   if (parts.length === 2) return parts.pop().split(";").shift();
   return "";
+}
+
+function getCsrfToken() {
+  return getCookie("csrftoken") || "";
 }
 
 async function processOutbox() {
@@ -416,8 +469,12 @@ async function processOutbox() {
 
   for (const item of items.sort((a, b) => (a.created_at || 0) - (b.created_at || 0))) {
 
+    // =========================
+    // 1) ServiceReport save
+    // =========================
     if (item.kind === "servicereport_save") {
       const payload = item.payload || {};
+
       if (payload.fields?.report_date) {
         payload.fields.report_date = normalizeDateToIso(payload.fields.report_date);
       }
@@ -425,40 +482,88 @@ async function processOutbox() {
       const resp = await fetch("/api/pwa/servicereport/save/", {
         method: "POST",
         headers: {
+          "Accept": "application/json",
           "Content-Type": "application/json",
-          "X-CSRFToken": getCookie("csrftoken"),
+          "X-CSRFToken": getCsrfToken(),
         },
         body: JSON.stringify(payload),
         credentials: "same-origin",
       });
 
       if (!resp.ok) break;
+
       await deleteOutbox(item.id);
       continue;
     }
 
+    // =========================
+    // 2) MaintenanceProtocol save  ✅ NOWE
+    // =========================
     if (item.kind === "maintenanceprotocol_save") {
       const payload = item.payload || {};
-      if (payload.fields?.date) {
-        payload.fields.date = normalizeDateToIso(payload.fields.date);
+
+      // normalizuj potencjalne pola dat
+      if (payload.fields) {
+        for (const k of Object.keys(payload.fields)) {
+          if (k === "date" || k.endsWith("_date")) {
+            payload.fields[k] = normalizeDateToIso(payload.fields[k]);
+          }
+        }
       }
 
       const resp = await fetch("/api/pwa/maintenanceprotocol/save/", {
         method: "POST",
         headers: {
+          "Accept": "application/json",
           "Content-Type": "application/json",
-          "X-CSRFToken": getCookie("csrftoken"),
+          "X-CSRFToken": getCsrfToken(),
         },
         body: JSON.stringify(payload),
         credentials: "same-origin",
       });
 
       if (!resp.ok) break;
+
+      await deleteOutbox(item.id);
+      continue;
+    }
+
+    // =========================
+    // 3) Workorder status set
+    // =========================
+    if (item.kind === "workorder_status_set") {
+      const woId = item.payload?.workorder_id;
+      const status = item.payload?.status;
+
+      const resp = await fetch(`/api/pwa/workorders/${woId}/set-status/`, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json",
+          "Content-Type": "application/json",
+          "X-CSRFToken": getCsrfToken(),
+        },
+        body: JSON.stringify({ status }),
+        credentials: "same-origin",
+      });
+
+      if (!resp.ok) break;
+
+      try {
+        const data = await resp.json();
+        const wo = await getByKey("workorders", data.id);
+        if (wo) {
+          wo.status_code = data.status_code;
+          wo.status_label = data.status_label;
+          await putMany("workorders", [wo]);
+        }
+      } catch (_) {}
+
       await deleteOutbox(item.id);
       continue;
     }
   }
 }
+
 
 
 function serializeForm(form) {
@@ -717,4 +822,121 @@ export function initPwaMaintenanceProtocolForm() {
 
     window.location.replace(backUrl);
   });
+}
+
+function bindWorkorderStatusToggle() {
+  const applyOffline = async (woId, nextStatus) => {
+    // 1) outbox – to MUSI się udać (inaczej nie mamy co syncować)
+    await enqueueOutbox("workorder_status_set", { workorder_id: woId, status: nextStatus });
+
+    // 2) lokalna aktualizacja – best-effort (nie może wywalać całości)
+    try {
+      const wo = await getByKey("workorders", woId);
+      if (wo) {
+        wo.status_code = nextStatus;
+        wo.status_label = (nextStatus === "REALIZED") ? "Zrealizowane" : "Realizacja";
+        await putMany("workorders", [wo]);
+      }
+    } catch (e) {
+      console.warn("Offline: nie udało się zaktualizować IDB workorders, ale outbox zapisany.", e);
+    }
+  };
+
+  const paintButton = (btn, statusNow) => {
+    const isRealized = (statusNow === "REALIZED");
+
+    btn.textContent = isRealized ? "PRZYWRÓĆ" : "ZREALIZUJ";
+    btn.dataset.nextStatus = isRealized ? "IN_PROGRESS" : "REALIZED";
+
+    btn.classList.remove("btn-success", "btn-secondary");
+    btn.classList.add(isRealized ? "btn-secondary" : "btn-success");
+  };
+
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-wo-status-toggle]");
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const woId = Number(btn.dataset.woId);
+    const nextStatus = btn.dataset.nextStatus;
+
+    btn.disabled = true;
+
+    try {
+      const ok = await pingServer(800);
+
+      if (ok) {
+        try {
+          const resp = await fetch(`/api/pwa/workorders/${woId}/set-status/`, {
+            method: "POST",
+            headers: {
+              "Accept": "application/json",
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCsrfToken(),
+            },
+            body: JSON.stringify({ status: nextStatus }),
+            credentials: "same-origin",
+          });
+
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+
+          const data = await resp.json();
+
+          try {
+            const wo = await getByKey("workorders", woId);
+            if (wo) {
+              wo.status_code = data.status_code;
+              wo.status_label = data.status_label;
+              await putMany("workorders", [wo]);
+            }
+          } catch (e) {
+            console.warn("Online: status zmieniony na serwerze, ale nie udało się zaktualizować IDB.", e);
+          }
+
+          paintButton(btn, data.status_code);
+          return;
+
+        } catch (errOnline) {
+          console.warn("Online request padł — przechodzę w OFFLINE fallback.", errOnline);
+          await applyOffline(woId, nextStatus);
+          paintButton(btn, nextStatus);
+          return;
+        }
+      }
+
+      // OFFLINE (ping nie przeszedł)
+      await applyOffline(woId, nextStatus);
+      paintButton(btn, nextStatus);
+
+    } catch (err) {
+      console.error("Toggle status FAILED:", err);
+      alert("Nie udało się zmienić statusu. Spróbuj ponownie.");
+    } finally {
+      btn.disabled = false;
+    }
+  }, { passive: false });
+}
+
+
+
+async function updateWoNotifBadge() {
+  const badge = document.getElementById("woNotifBadge");
+  if (!badge) return;
+
+  // jeśli masz IDB z workorders: liczymy ile jest w bazie lokalnej
+  // i pokazujemy po prostu "ile jest do roboty" (Realizacja + Zrealizowane)
+  try {
+    const all = await getAll("workorders");
+    const count = (all || []).filter(w => w && (w.status === "IN_PROGRESS" || w.status === "REALIZED")).length;
+
+    if (count > 0) {
+      badge.textContent = String(count);
+      badge.style.display = "inline-block";
+    } else {
+      badge.style.display = "none";
+    }
+  } catch (e) {
+    badge.style.display = "none";
+  }
 }

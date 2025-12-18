@@ -35,7 +35,6 @@
 </div>
 
 <div class="row g-3">
-  <!-- LEWA KOLUMNA: podstawowe info -->
   <div class="col-lg-6">
     <div class="card shadow-sm border-0 mb-3">
       <div class="card-header bg-white">
@@ -57,20 +56,24 @@
 
         <div class="mb-2">
           <span class="text-muted small">Status:</span>
+
           {% if order.status == order.Status.NEW %}
-          <span class="badge bg-primary">Nowe</span>
+          <span class="badge bg-primary">Do umówienia</span>
 
           {% elif order.status == order.Status.SCHEDULED %}
           <span class="badge bg-info text-dark">Umówione</span>
 
           {% elif order.status == order.Status.IN_PROGRESS %}
-          <span class="badge bg-warning text-dark">W realizacji</span>
+          <span class="badge bg-warning text-dark">Realizacja</span>
+
+          {% elif order.status == order.Status.REALIZED %}
+          <span class="badge bg-primary">Zrealizowane</span>
 
           {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-          <span class="badge bg-secondary">Czeka na decyzję</span>
+          <span class="badge bg-secondary">Decyzja</span>
 
           {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-          <span class="badge bg-secondary">Czeka na materiał</span>
+          <span class="badge bg-secondary">Materiał</span>
 
           {% elif order.status == order.Status.COMPLETED %}
           <span class="badge bg-success">Zakończone</span>
@@ -82,6 +85,18 @@
           <span class="badge bg-light text-dark">Inny</span>
           {% endif %}
         </div>
+
+        {# ZREALIZUJ / PRZYWRÓĆ (tylko dla Realizacja/Zrealizowane; uprawnienia i tak pilnuje view) #}
+        {% if order.status == order.Status.IN_PROGRESS or order.status == order.Status.REALIZED %}
+        <form method="post" action="{% url 'core:workorder_toggle_realized' order.pk %}" class="mb-2">
+          {% csrf_token %}
+          {% if order.status == order.Status.IN_PROGRESS %}
+          <button class="btn btn-sm btn-success">ZREALIZUJ</button>
+          {% else %}
+          <button class="btn btn-sm btn-outline-secondary">PRZYWRÓĆ</button>
+          {% endif %}
+        </form>
+        {% endif %}
 
         <div class="mb-2">
           <span class="text-muted">Termin realizacji:</span>
@@ -139,7 +154,6 @@
     </div>
   </div>
 
-  <!-- PRAWA KOLUMNA: opis, systemy, protokół -->
   <div class="col-lg-6">
     <div class="card shadow-sm border-0 mb-3">
       <div class="card-header bg-white">
@@ -194,7 +208,6 @@
       </div>
     </div>
 
-    <!-- Protokół serwisowy – miejsce pod UX -->
     {% if order.work_type == order.WorkOrderType.SERVICE %}
     <div class="card shadow-sm border-0">
       <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -230,6 +243,7 @@
       </div>
     </div>
     {% endif %}
+
     {% if maintenance_protocol %}
     <div class="card mt-3">
       <div class="card-body">
@@ -243,15 +257,9 @@
           ----
           {% endif %}
         </p>
-        {% if maintenance_protocol.next_period_month %}
-        <p class="mb-1">
-          <strong>Następny przegląd:</strong>
-          {{ maintenance_protocol.next_period_month }}/{{ maintenance_protocol.next_period_year }}
-        </p>
-        {% endif %}
 
         <a href="{% url 'core:maintenance_protocol_detail' maintenance_protocol.pk %}"
-          class="btn btn-sm btn-outline-primary">
+          class="btn btn-sm btn-outline-primary mt-2">
           Podgląd protokołu konserwacji
         </a>
       </div>

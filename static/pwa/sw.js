@@ -2,7 +2,7 @@
 // SW tylko dla "app shell": PWA strony + statyki.
 // Dane są w IndexedDB, więc NIE cache'ujemy /api/.
 
-const CACHE_NAME = "allsec-pwa-shell-v4";
+const CACHE_NAME = "allsec-pwa-shell-v5";
 
 const SHELL_URLS = [
   "/pwa/",

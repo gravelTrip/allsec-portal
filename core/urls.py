@@ -13,12 +13,16 @@ urlpatterns = [
     path("pwa/obiekty/", views_pwa.pwa_objects, name="pwa_objects"),
     path("pwa/zlecenia/", views_pwa.pwa_workorder_list, name="pwa_workorder_list"),
     path("pwa/zlecenia/<int:pk>/", views_pwa.pwa_workorder_detail, name="pwa_workorder_detail"),
+    path("zlecenia/<int:pk>/toggle-realized/", views.workorder_toggle_realized, name="workorder_toggle_realized"),
+    path("powiadomienia/zlecenia/", views.workorder_events, name="workorder_events"),
+    path("powiadomienia/zlecenia/mark-all-read/", views.workorder_events_mark_all_read, name="workorder_events_mark_all_read"),
 
     path("pwa/zlecenia/<int:pk>/protokol/", views_pwa.pwa_servicereport_entry, name="pwa_servicereport_entry"),
     path("pwa/protokoly/serwis/<int:pk>/", views_pwa.pwa_servicereport_edit, name="pwa_servicereport_edit"),
 
     path("api/pwa/workorders/dump/", views_pwa.api_pwa_workorders_dump, name="api_pwa_workorders_dump"),
     path("api/pwa/servicereport/save/", views_pwa.api_pwa_servicereport_save, name="api_pwa_servicereport_save"),
+    path("api/pwa/workorders/<int:pk>/set-status/", views_pwa.api_pwa_workorder_set_status, name="api_pwa_workorder_set_status"),
 
     path("pwa/zlecenia/<int:pk>/protokol-konserwacji/", views_pwa.pwa_maintenanceprotocol_entry, name="pwa_maintenanceprotocol_entry"),
     path("pwa/protokoly/konserwacja/<int:pk>/", views_pwa.pwa_maintenanceprotocol_edit, name="pwa_maintenanceprotocol_edit"),

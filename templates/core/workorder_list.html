@@ -3,209 +3,210 @@
 {% block title %}Zlecenia – ALLSEC Portal{% endblock %}
 
 {% block content %}
-      <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-0">Zlecenia</h1>
-      <p class="text-muted small mb-0">
-        Lista wszystkich serwisów, konserwacji i montaży
-      </p>
-    </div>
-
-    <div class="d-flex align-items-center gap-2">
-      <form method="get" class="d-flex align-items-center gap-2 mb-0">
-        <div class="form-check form-check-inline ms-2 mb-0" style="white-space: nowrap;">
-          <input class="form-check-input" type="checkbox" id="show_closed"
-                name="show_closed" {% if show_closed %}checked{% endif %}>
-          <label class="form-check-label small" for="show_closed">
-            Pokaż zakończone / odwołane
-          </label>
-        </div>
-
-        <select name="work_type" class="form-select form-select-sm">
-          {% for value, label in work_type_choices %}
-            <option value="{{ value }}"
-                    {% if value == filter_work_type %}selected{% endif %}>
-              {{ label }}
-            </option>
-          {% endfor %}
-        </select>
-
-        <select name="status" class="form-select form-select-sm">
-          {% for value, label in status_choices %}
-            <option value="{{ value }}"
-                    {% if value == filter_status %}selected{% endif %}>
-              {{ label }}
-            </option>
-          {% endfor %}
-        </select>
-
-        
-
-        <button class="btn btn-sm btn-outline-secondary" type="submit">
-          Filtruj
-        </button>
-
-        {% if filter_work_type or filter_status or show_closed %}
-          <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-link">
-            Wyczyść
-          </a>
-        {% endif %}
-      </form>
-
-      {% if can_create %}
-        <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-success">
-          Nowe zlecenie
-        </a>
-      {% endif %}
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0">Zlecenia</h1>
+    <p class="text-muted small mb-0">
+      Lista wszystkich serwisów, konserwacji i montaży
+    </p>
   </div>
 
+  <div class="d-flex align-items-center gap-2">
+    <form method="get" class="d-flex align-items-center gap-2 mb-0">
+      <div class="form-check form-check-inline ms-2 mb-0" style="white-space: nowrap;">
+        {% if show_closed %}
+        <input class="form-check-input" type="checkbox" id="show_closed" name="show_closed" {% if show_closed %}checked{% endif %}>
+        {% else %}
+        <input class="form-check-input" type="checkbox" id="show_closed" name="show_closed">
+        {% endif %}
 
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-0">
-      <table class="table table-hover mb-0 align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>Numer</th>
-            <th>Utworzone</th>
-            <th>Tytuł</th>
-            <th>Obiekt</th>
-            <th>Typ</th>
-            <th>Status</th>
-            <th>Termin realizacji</th>
-            <th>Przypisano do</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if orders %}
-            {% for order in orders %}
-              <tr>
-                <td>
-                  {% if order.number %}
-                    {{ order.number }}
-                  {% else %}
-                    #{{ order.id }}
-                  {% endif %}
-                </td>
-                <td>
-                  {{ order.created_at|date:"d.m.Y" }}
-                </td>
-                <td>{{ order.title }}</td>
-                <td>
-                  {% if order.site %}
-                    {{ order.site.name }}<br>
-                    <span class="small text-muted">
-                      {{ order.site.city }}
-                    </span>
-                  {% else %}
-                    &#8212;
-                  {% endif %}
-                </td>
-                <td>
-                  {% if order.work_type == order.WorkOrderType.SERVICE %}
-                    <span class="badge bg-danger">Serwis</span>
-                  {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-                    <span class="badge bg-info text-dark">Konserwacja</span>
-                  {% elif order.work_type == order.WorkOrderType.JOB %}
-                    <span class="badge bg-secondary">Montaż</span>
-                  {% else %}
-                    <span class="badge bg-light text-dark">Inne</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if order.status == order.Status.NEW %}
-                    <span class="badge bg-primary">Nowe</span>
-
-                  {% elif order.status == order.Status.SCHEDULED %}
-                    <span class="badge bg-info text-dark">Umówione</span>
-
-                  {% elif order.status == order.Status.IN_PROGRESS %}
-                    <span class="badge bg-warning text-dark">W realizacji</span>
-
-                  {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-                    <span class="badge bg-secondary">Czeka na decyzję</span>
-
-                  {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-                    <span class="badge bg-secondary">Czeka na materiał</span>
-
-                  {% elif order.status == order.Status.COMPLETED %}
-                    <span class="badge bg-success">Zakończone</span>
-
-                  {% elif order.status == order.Status.CANCELLED %}
-                    <span class="badge bg-danger">Odwołane</span>
-
-                  {% else %}
-                    <span class="badge bg-light text-dark">Inny</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {{ order.planned_date|date:"d.m.Y" }}
-                </td>
-                <td>
-                  {% if order.assigned_to %}
-                    {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
-                  {% else %}
-                    <span class="text-muted small">nieprzypisane</span>
-                  {% endif %}
-                </td>
-                <td class="text-end">
-                  <a href="{% url 'core:workorder_detail' order.pk %}" class="btn btn-sm btn-primary">
-                    Szczegóły
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          {% else %}
-            <tr>
-              <td colspan="9" class="text-center text-muted small py-3">
-                Brak zleceń w systemie.
-              </td>
-            </tr>
-          {% endif %}
-        </tbody>
-      </table>
-   </div>
-
-    <!-- PAGINACJA -->
-    {% if page_obj.has_other_pages %}
-      <div class="card-footer bg-white">
-        <nav aria-label="Paginacja zleceń">
-          <ul class="pagination pagination-sm mb-0 justify-content-end">
-            {% if page_obj.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">«</span>
-              </li>
-            {% endif %}
-
-            {% for num in paginator.page_range %}
-              {% if num == page_obj.number %}
-                <li class="page-item active" aria-current="page">
-                  <span class="page-link">{{ num }}</span>
-                </li>
-              {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <li class="page-item">
-                  <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                </li>
-              {% endif %}
-            {% endfor %}
-
-            {% if page_obj.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">»</span>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
+        <label class="form-check-label small" for="show_closed">
+          Pokaż zakończone / odwołane
+        </label>
       </div>
+
+      <select name="work_type" class="form-select form-select-sm">
+        {% for value, label in work_type_choices %}
+        <option value="{{ value }}" {% if value == filter_work_type %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <select name="status" class="form-select form-select-sm">
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if value == filter_status %}selected{% endif %}>
+          {{ label }}
+        </option>
+        {% endfor %}
+      </select>
+
+      <button class="btn btn-sm btn-outline-secondary" type="submit">
+        Filtruj
+      </button>
+
+      {% if filter_work_type or filter_status or show_closed %}
+      <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-link">
+        Wyczyść
+      </a>
+      {% endif %}
+    </form>
+
+    {% if can_create %}
+    <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-success">
+      Nowe zlecenie
+    </a>
     {% endif %}
   </div>
+</div>
+
+
+<div class="card shadow-sm border-0">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Numer</th>
+          <th>Utworzone</th>
+          <th>Tytuł</th>
+          <th>Obiekt</th>
+          <th>Typ</th>
+          <th>Status</th>
+          <th>Termin realizacji</th>
+          <th>Przypisano do</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if orders %}
+        {% for order in orders %}
+        <tr>
+          <td>
+            {% if order.number %}
+            {{ order.number }}
+            {% else %}
+            #{{ order.id }}
+            {% endif %}
+          </td>
+          <td>
+            {{ order.created_at|date:"d.m.Y" }}
+          </td>
+          <td>{{ order.title }}</td>
+          <td>
+            {% if order.site %}
+            {{ order.site.name }}<br>
+            <span class="small text-muted">
+              {{ order.site.city }}
+            </span>
+            {% else %}
+            &#8212;
+            {% endif %}
+          </td>
+          <td>
+            {% if order.work_type == order.WorkOrderType.SERVICE %}
+            <span class="badge bg-danger">Serwis</span>
+            {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+            <span class="badge bg-info text-dark">Konserwacja</span>
+            {% elif order.work_type == order.WorkOrderType.JOB %}
+            <span class="badge bg-secondary">Montaż</span>
+            {% else %}
+            <span class="badge bg-light text-dark">Inne</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if order.status == order.Status.NEW %}
+            <span class="badge bg-primary">Do umówienia</span>
+
+            {% elif order.status == order.Status.SCHEDULED %}
+            <span class="badge bg-info text-dark">Umówione</span>
+
+            {% elif order.status == order.Status.IN_PROGRESS %}
+            <span class="badge bg-warning text-dark">Realizacja</span>
+
+            {% elif order.status == order.Status.REALIZED %}
+            <span class="badge bg-primary">Zrealizowane</span>
+
+            {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+            <span class="badge bg-secondary">Decyzja</span>
+
+            {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+            <span class="badge bg-secondary">Materiał</span>
+
+            {% elif order.status == order.Status.COMPLETED %}
+            <span class="badge bg-success">Zakończone</span>
+
+            {% elif order.status == order.Status.CANCELLED %}
+            <span class="badge bg-danger">Odwołane</span>
+
+            {% else %}
+            <span class="badge bg-light text-dark">Inny</span>
+            {% endif %}
+          </td>
+          <td>
+            {{ order.planned_date|date:"d.m.Y" }}
+          </td>
+          <td>
+            {% if order.assigned_to %}
+            {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+            {% else %}
+            <span class="text-muted small">nieprzypisane</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{% url 'core:workorder_detail' order.pk %}" class="btn btn-sm btn-primary">
+              Szczegóły
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+        {% else %}
+        <tr>
+          <td colspan="9" class="text-center text-muted small py-3">
+            Brak zleceń w systemie.
+          </td>
+        </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="card-footer bg-white">
+    <nav aria-label="Paginacja zleceń">
+      <ul class="pagination pagination-sm mb-0 justify-content-end">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+          <span class="page-link">«</span>
+        </li>
+        {% endif %}
+
+        {% for num in paginator.page_range %}
+        {% if num == page_obj.number %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">{{ num }}</span>
+        </li>
+        {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li class="page-item">
+          <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+          </li>
+          {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled">
+            <span class="page-link">»</span>
+          </li>
+          {% endif %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
 {% endblock %}

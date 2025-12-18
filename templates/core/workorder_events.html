@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Powiadomienia – ALLSEC Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h1 class="h4 mb-0">Powiadomienia zleceń</h1>
+        <p class="text-muted small mb-0">Zmiany statusu wykonane przez serwisantów.</p>
+    </div>
+
+    <form method="post" action="{% url 'core:workorder_events_mark_all_read' %}">
+        {% csrf_token %}
+        <button class="btn btn-sm btn-primary">Oznacz wszystkie jako przeczytane</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-body small">
+        {% for e in events %}
+        <div class="border-bottom py-2">
+            <div class="fw-semibold">
+                Zlecenie:
+                <a href="{% url 'core:workorder_detail' e.work_order_id %}">#{{ e.work_order_id }}</a>
+                {% if not e.is_read %}<span class="badge bg-warning text-dark ms-2">NOWE</span>{% endif %}
+            </div>
+            <div class="text-muted">
+                {{ e.created_at|date:"d.m.Y H:i" }} •
+                {{ e.actor.get_full_name|default:e.actor.username|default:"(brak)" }} •
+                {{ e.old_status }} → {{ e.new_status }}
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-muted">Brak powiadomień.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

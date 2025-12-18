@@ -669,13 +669,18 @@ class WorkOrder(models.Model):
         OTHER = "OTHER", "Inne"
 
     class Status(models.TextChoices):
-        NEW = "NEW", "Nowe"
-        SCHEDULED = "SCHEDULED", "Umówione"
-        IN_PROGRESS = "IN_PROGRESS", "W realizacji"
-        WAITING_FOR_DECISION = "WAITING_FOR_DECISION", "Czeka na decyzję klienta"
-        WAITING_FOR_PARTS = "WAITING_FOR_PARTS", "Czeka na materiał"
+        NEW = "NEW", "Do umówienia"                 # (tylko biuro)
+        SCHEDULED = "SCHEDULED", "Umówione"        # (tylko biuro)
+        IN_PROGRESS = "IN_PROGRESS", "Realizacja"  # (biuro + PWA)
+        REALIZED = "REALIZED", "Zrealizowane"      # (biuro + PWA)
+
+        WAITING_FOR_DECISION = "WAITING_FOR_DECISION", "Decyzja"
+        WAITING_FOR_PARTS = "WAITING_FOR_PARTS", "Materiał"
+
         COMPLETED = "COMPLETED", "Zakończone"
         CANCELLED = "CANCELLED", "Odwołane"
+
+
 
     class VisitType(models.TextChoices):
         FLEXIBLE = "FLEXIBLE", "W ciągu dnia"
@@ -844,6 +849,53 @@ class WorkOrder(models.Model):
             self.number = f"ZL {count:02d}-{date_suffix}"
 
         super().save(*args, **kwargs)
+
+class WorkOrderEvent(models.Model):
+    class Kind(models.TextChoices):
+        STATUS_CHANGE = "STATUS_CHANGE", "Zmiana statusu"
+
+    work_order = models.ForeignKey(
+        "WorkOrder",
+        on_delete=models.CASCADE,
+        related_name="events",
+        verbose_name="Zlecenie",
+    )
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workorder_events",
+        verbose_name="Użytkownik",
+    )
+
+    kind = models.CharField(
+        max_length=32,
+        choices=Kind.choices,
+        default=Kind.STATUS_CHANGE,
+        verbose_name="Typ zdarzenia",
+    )
+
+    old_status = models.CharField(max_length=32, blank=True, verbose_name="Status poprzedni")
+    new_status = models.CharField(max_length=32, verbose_name="Status nowy")
+
+    source = models.CharField(
+        max_length=16,
+        default="PORTAL",
+        verbose_name="Źródło",
+    )
+
+    is_read = models.BooleanField(default=False, verbose_name="Przeczytane (biuro)")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Utworzono")
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Powiadomienie zlecenia"
+        verbose_name_plural = "Powiadomienia zleceń"
+
+    def __str__(self):
+        return f"{self.work_order_id}: {self.old_status} -> {self.new_status}"
+
 
 class MaintenanceProtocol(models.Model):
     """Protokół konserwacji (przegląd okresowy) powiązany ze zleceniem MAINTENANCE."""
