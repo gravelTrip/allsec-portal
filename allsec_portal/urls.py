@@ -16,11 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from core.views import RoleBasedLoginView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("core.urls")),
+
+    # login z redirectem wg roli
+    path("accounts/login/", RoleBasedLoginView.as_view(), name="login"),
+
+    # reszta auth urli (logout itd.)
     path("accounts/", include("django.contrib.auth.urls")),
 ]
-
 

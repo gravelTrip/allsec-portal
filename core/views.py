@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
 from django.contrib import messages
+from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import date, timedelta
@@ -1651,3 +1652,18 @@ def workorder_event_open(request, event_id):
         return redirect("core:workorder_detail", pk=ev.work_order_id)
 
     return redirect("core:workorder_events")
+
+class RoleBasedLoginView(LoginView):
+    template_name = "registration/login.html"
+
+    def get_success_url(self):
+        user = self.request.user
+        is_office = user.is_superuser or user.groups.filter(name="office").exists()
+        is_technician = user.groups.filter(name="technician").exists()
+
+        # serwisant -> zawsze PWA (ignorujemy next)
+        if is_technician and not is_office:
+            return reverse("core:pwa_home")
+
+        # biuro -> dashboard
+        return reverse("core:dashboard")
