@@ -59,7 +59,9 @@ Protokół konserwacji – {{ site.name }}
     <div class="card-body">
         <form method="post" id="maintenance-protocol-form" novalidate>
             {% csrf_token %}
-
+            {{ form.next_period_month.as_hidden }}
+            {{ form.next_period_year.as_hidden }}
+            {{ form.status.as_hidden }}
             {% if form.non_field_errors %}
             <div class="alert alert-danger py-2 small">
                 {{ form.non_field_errors }}
@@ -71,24 +73,6 @@ Protokół konserwacji – {{ site.name }}
                     <label class="form-label small">Data wykonania przeglądu</label>
                     {{ form.date }}
                     {{ form.date.errors }}
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label small">Miesiąc następnego przeglądu</label>
-                    {{ form.next_period_month }}
-                    {{ form.next_period_month.errors }}
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label small">Rok następnego przeglądu</label>
-                    {{ form.next_period_year }}
-                    {{ form.next_period_year.errors }}
-                </div>
-
-                <div class="col-md-3">
-                    <label class="form-label small">Status</label>
-                    {{ form.status }}
-                    {{ form.status.errors }}
                 </div>
             </div>
 
@@ -124,9 +108,8 @@ Protokół konserwacji – {{ site.name }}
                             <thead>
                                 <tr>
                                     <th style="width: 3rem;">Lp.</th>
-                                    <th style="width: 55%;">Czynność</th>
-                                    <th style="width: 15%;">Wynik</th>
-                                    <th style="width: 27%;">Tekst własny</th>
+                                    <th style="width: 70%;">Czynność</th>
+                                    <th style="width: 30%;">Wynik</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -136,22 +119,21 @@ Protokół konserwacji – {{ site.name }}
                                         {{ forloop.counter }}
                                         {{ item_form.id }}
                                     </td>
+
                                     <td>
-                                        {{ item_form.instance.label }}
+                                        <div class="small fw-semibold mb-1">
+                                            {{ item_form.instance.label }}
+                                        </div>
+                                        <div>
+                                            {{ item_form.note.errors }}
+                                            {{ item_form.note }}
+                                        </div>
                                     </td>
+
                                     <td>
+                                        <div class="small fw-semibold mb-1">Wynik:</div>
                                         {{ item_form.result.errors }}
                                         {{ item_form.result }}
-                                    </td>
-                                    <td>
-                                        {{ item_form.note.errors }}
-                                        {{ item_form.note }}
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="4" class="text-muted small">
-                                        Brak punktów kontrolnych w tej sekcji.
                                     </td>
                                 </tr>
                                 {% endfor %}

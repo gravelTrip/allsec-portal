@@ -51,12 +51,15 @@
     </p>
     <p class="mb-0">
       <strong>Wykonanie:</strong>
-      {% if protocol.period_display %}
-      {{ protocol.period_display }}
+      {% if protocol.date %}
+      {{ protocol.date|date:"d.m.Y" }}
+      {% elif work_order and work_order.planned_date %}
+      {{ work_order.planned_date|date:"d.m.Y" }}
       {% else %}
       —
       {% endif %}
     </p>
+
 
     {% if protocol.next_period_display %}
     <p class="mb-0">
@@ -87,16 +90,20 @@
       <table class="table table-sm mt-3">
         <thead>
           <tr>
-            <th style="width: 55%;">Czynność</th>
-            <th style="width: 10%;">Wynik</th>
-            <th style="width: 35%;">Tekst własny</th>
+            <th style="width: 85%;">Czynność</th>
+            <th style="width: 15%;">Wynik</th>
           </tr>
         </thead>
         <tbody>
           {% for item in section.check_items.all %}
           {% if item.active %}
           <tr>
-            <td>{{ item.label }}</td>
+            <td>
+              {{ item.label }}
+              {% if item.note %}
+              <strong> ("{{ item.note }}")</strong>
+              {% endif %}
+            </td>
             <td>
               {% if item.result %}
               {{ item.get_result_display }}
@@ -104,8 +111,8 @@
               —
               {% endif %}
             </td>
-            <td>{{ item.note|linebreaksbr }}</td>
           </tr>
+
           {% endif %}
           {% endfor %}
         </tbody>

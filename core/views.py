@@ -514,7 +514,7 @@ def workorder_create(request):
             if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
                 # zabezpieczenie: nie twórz dwa razy
                 if not hasattr(order, "maintenance_protocol"):
-                    # Ustalamy okres przeglądu na podstawie planned_date
+                    # Ustalamy okres przeglądu + datę wykonania na podstawie planned_date
                     if order.planned_date:
                         period_date = order.planned_date
                     else:
@@ -534,11 +534,14 @@ def workorder_create(request):
                     protocol = MaintenanceProtocol.objects.create(
                         work_order=order,
                         site=order.site,
+                        # ✅ NOWE: data wykonania przeglądu
+                        date=period_date,
                         period_year=period_year,
                         period_month=period_month,
                         next_period_year=next_year,
                         next_period_month=next_month,
                     )
+
                     # Nadaj numer KS, jeśli jeszcze nie ma
                     protocol.assign_number_if_needed()
 
@@ -586,6 +589,7 @@ def workorder_create(request):
     }
     return render(request, "core/workorder_form.html", context)
 
+
 @login_required
 def workorder_edit(request, pk):
     order = get_object_or_404(WorkOrder, pk=pk)
@@ -597,7 +601,47 @@ def workorder_edit(request, pk):
     if request.method == "POST":
         form = WorkOrderForm(request.POST, instance=order)
         if form.is_valid():
-            form.save()
+            order = form.save()
+
+            # ✅ NOWE: jeśli to MAINTENANCE i jest protokół KS – aktualizuj datę wykonania z terminu zlecenia
+            if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE and hasattr(order, "maintenance_protocol"):
+                protocol = order.maintenance_protocol
+
+                if order.planned_date:
+                    period_date = order.planned_date
+                else:
+                    period_date = timezone.localdate()
+
+                update_fields = []
+
+                if protocol.date != period_date:
+                    protocol.date = period_date
+                    update_fields.append("date")
+
+                if protocol.period_year != period_date.year:
+                    protocol.period_year = period_date.year
+                    update_fields.append("period_year")
+
+                if protocol.period_month != period_date.month:
+                    protocol.period_month = period_date.month
+                    update_fields.append("period_month")
+
+                # przelicz następny przegląd wg ustawień obiektu
+                if order.site:
+                    ny, nm = order.site.get_next_maintenance_period(
+                        from_year=protocol.period_year,
+                        from_month=protocol.period_month,
+                    )
+                    if protocol.next_period_year != ny:
+                        protocol.next_period_year = ny
+                        update_fields.append("next_period_year")
+                    if protocol.next_period_month != nm:
+                        protocol.next_period_month = nm
+                        update_fields.append("next_period_month")
+
+                if update_fields:
+                    protocol.save(update_fields=update_fields)
+
             return redirect("core:workorder_detail", pk=order.pk)
     else:
         form = WorkOrderForm(instance=order)
@@ -608,6 +652,7 @@ def workorder_edit(request, pk):
         "order": order,
     }
     return render(request, "core/workorder_form.html", context)
+
 
 # =========================
 # OBIEKTY (Site)
