@@ -1584,7 +1584,44 @@ def workorder_events(request):
 
     qs = WorkOrderEvent.objects.select_related("work_order", "actor")
     return render(request, "core/workorder_events.html", {"events": qs[:200]})
-    
+
+@login_required
+def api_workorder_events_unread_count(request):
+    # Portal jest biurowy, ale zabezpieczamy:
+    if not is_office(request.user):
+        return JsonResponse({"count": 0})
+
+    count = WorkOrderEvent.objects.filter(is_read=False).count()
+    return JsonResponse({"count": count})
+
+@login_required
+def api_workorder_events_unread_latest(request):
+    if not is_office(request.user):
+        return JsonResponse({"items": []})
+
+    qs = (
+        WorkOrderEvent.objects
+        .filter(is_read=False)
+        .select_related("work_order", "actor")
+        .order_by("-created_at")[:5]
+    )
+
+    items = []
+    for ev in qs:
+        wo = ev.work_order
+        actor = ev.actor.get_full_name() if ev.actor else ""
+        wo_label = wo.number or f"#{wo.id}"
+
+        items.append({
+            "id": ev.id,
+            "title": f"{wo_label} – zmiana statusu",
+            "meta": f"{actor}".strip() or "system",
+            "created_at": ev.created_at.strftime("%d.%m.%Y %H:%M"),
+            "url": reverse("core:workorder_event_open", kwargs={"event_id": ev.id}),
+        })
+
+    return JsonResponse({"items": items})
+
 
 @login_required
 @require_POST
@@ -1594,4 +1631,23 @@ def workorder_events_mark_all_read(request):
 
     WorkOrderEvent.objects.filter(is_read=False).update(is_read=True)
     messages.success(request, "Oznaczono wszystkie powiadomienia jako przeczytane.")
+    return redirect("core:workorder_events")
+
+@login_required
+def workorder_event_open(request, event_id):
+    if not is_office(request.user):
+        return HttpResponseForbidden("Tylko biuro")
+
+    ev = get_object_or_404(
+        WorkOrderEvent.objects.select_related("work_order"),
+        pk=event_id
+    )
+
+    if not ev.is_read:
+        ev.is_read = True
+        ev.save(update_fields=["is_read"])
+
+    if ev.work_order_id:
+        return redirect("core:workorder_detail", pk=ev.work_order_id)
+
     return redirect("core:workorder_events")

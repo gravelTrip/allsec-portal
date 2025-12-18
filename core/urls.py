@@ -16,6 +16,10 @@ urlpatterns = [
     path("zlecenia/<int:pk>/toggle-realized/", views.workorder_toggle_realized, name="workorder_toggle_realized"),
     path("powiadomienia/zlecenia/", views.workorder_events, name="workorder_events"),
     path("powiadomienia/zlecenia/mark-all-read/", views.workorder_events_mark_all_read, name="workorder_events_mark_all_read"),
+    path("api/powiadomienia/zlecenia/unread-count/",views.api_workorder_events_unread_count,name="api_workorder_events_unread_count"),
+    path("api/powiadomienia/zlecenia/unread-latest/",views.api_workorder_events_unread_latest,name="api_workorder_events_unread_latest"),
+    path("powiadomienia/zlecenia/<int:event_id>/open/", views.workorder_event_open, name="workorder_event_open"),
+
 
     path("pwa/zlecenia/<int:pk>/protokol/", views_pwa.pwa_servicereport_entry, name="pwa_servicereport_entry"),
     path("pwa/protokoly/serwis/<int:pk>/", views_pwa.pwa_servicereport_edit, name="pwa_servicereport_edit"),

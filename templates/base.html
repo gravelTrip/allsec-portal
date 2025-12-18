@@ -28,6 +28,41 @@
 
       {% if request.user.is_authenticated %}
       <div class="d-flex align-items-center ms-auto">
+        <div class="dropdown me-2">
+  <button class="btn btn-outline-light btn-sm border-0 shadow-none position-relative dropdown-toggle"
+
+          type="button"
+          id="woNotifBell"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+          title="Powiadomienia zleceń">
+    🔔
+    <span id="woNotifBadge"
+          class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-warning text-dark d-none">
+      0
+    </span>
+  </button>
+
+  <div class="dropdown-menu dropdown-menu-end p-2" aria-labelledby="woNotifBell" style="min-width: 360px;">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="fw-semibold small">Powiadomienia</div>
+      <a href="{% url 'core:workorder_events' %}" class="small">Zobacz wszystkie</a>
+    </div>
+
+    <div id="woNotifDropdownList" class="list-group list-group-flush">
+      <div class="text-muted small py-2">Ładowanie…</div>
+    </div>
+
+    <div class="mt-2 d-flex justify-content-between">
+      <form method="post" action="{% url 'core:workorder_events_mark_all_read' %}" class="mb-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-sm btn-outline-secondary">Oznacz wszystkie</button>
+      </form>
+      <button type="button" class="btn btn-sm btn-outline-secondary" id="woNotifRefreshBtn">Odśwież</button>
+    </div>
+  </div>
+</div>
+
         <span class="text-white-50 me-3 small">
           Zalogowano jako:
           <strong>
@@ -133,6 +168,88 @@
   <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="{% static 'js/dashboard.js' %}"></script>
+  <script>
+(function () {
+  const badge = document.getElementById("woNotifBadge");
+  const listEl = document.getElementById("woNotifDropdownList");
+  const refreshBtn = document.getElementById("woNotifRefreshBtn");
+
+  if (!badge) return;
+
+  function setBadge(count) {
+    if (count > 0) {
+      badge.textContent = count > 99 ? "99+" : String(count);
+      badge.classList.remove("d-none");
+    } else {
+      badge.classList.add("d-none");
+    }
+  }
+
+  async function refreshCount() {
+    const resp = await fetch("{% url 'core:api_workorder_events_unread_count' %}", {
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    setBadge(Number(data.count || 0));
+  }
+
+  async function refreshLatest() {
+    if (!listEl) return;
+
+    const resp = await fetch("{% url 'core:api_workorder_events_unread_latest' %}", {
+      headers: { "Accept": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store"
+    });
+    if (!resp.ok) return;
+
+    const data = await resp.json();
+    const items = data.items || [];
+
+    if (!items.length) {
+      listEl.innerHTML = '<div class="text-muted small py-2">Brak nowych powiadomień.</div>';
+      return;
+    }
+
+    listEl.innerHTML = items.map(it => `
+      <a href="${it.url}" class="list-group-item list-group-item-action py-2">
+        <div class="d-flex justify-content-between">
+          <div class="fw-semibold small">${escapeHtml(it.title)}</div>
+          <div class="text-muted small">${escapeHtml(it.created_at)}</div>
+        </div>
+        <div class="text-muted small">${escapeHtml(it.meta)}</div>
+      </a>
+    `).join("");
+  }
+
+  function escapeHtml(s) {
+    return String(s || "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+    }[c]));
+  }
+
+  async function refreshAll() {
+    try {
+      await refreshCount();
+      await refreshLatest();
+    } catch (_) {}
+  }
+
+  refreshAll();
+  setInterval(refreshAll, 45000);
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) refreshAll();
+  });
+
+  if (refreshBtn) refreshBtn.addEventListener("click", refreshAll);
+})();
+</script>
+
+
 </body>
 
 </html>

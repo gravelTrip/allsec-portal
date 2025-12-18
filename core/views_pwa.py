@@ -696,8 +696,8 @@ def api_pwa_workorder_set_status(request, pk: int):
         wo.status = new_status
         wo.save(update_fields=["status", "updated_at"])
 
-        # powiadomienie dla biura tylko gdy zmiana od serwisanta (nie biuro)
-        if not is_office(request.user):
+        # powiadomienie dla biura: gdy zmiana jest wykonana przez przypisanego serwisanta
+        if request.user.id == wo.assigned_to_id:
             WorkOrderEvent.objects.create(
                 work_order=wo,
                 actor=request.user,
@@ -707,6 +707,7 @@ def api_pwa_workorder_set_status(request, pk: int):
                 source="PWA",
                 is_read=False,
             )
+
 
     return JsonResponse({
         "id": wo.id,

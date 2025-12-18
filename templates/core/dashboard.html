@@ -215,16 +215,35 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if order.status == order.Status.NEW %}
-                  <span class="badge bg-primary">Nowe</span>
-                  {% elif order.status == order.Status.IN_PROGRESS %}
-                  <span class="badge bg-warning text-dark">W realizacji</span>
-                  {% elif order.status == order.Status.COMPLETED %}
-                  <span class="badge bg-success">Zamknięte</span>
-                  {% else %}
-                  <span class="badge bg-light text-dark">Inny</span>
-                  {% endif %}
-                </td>
+  {% if order.status == order.Status.NEW %}
+    <span class="badge bg-primary">Do umówienia</span>
+
+  {% elif order.status == order.Status.SCHEDULED %}
+    <span class="badge bg-info text-dark">Umówione</span>
+
+  {% elif order.status == order.Status.IN_PROGRESS %}
+    <span class="badge bg-warning text-dark">Realizacja</span>
+
+  {% elif order.status == order.Status.REALIZED %}
+    <span class="badge bg-primary">Zrealizowane</span>
+
+  {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+    <span class="badge bg-secondary">Decyzja</span>
+
+  {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+    <span class="badge bg-secondary">Materiał</span>
+
+  {% elif order.status == order.Status.COMPLETED %}
+    <span class="badge bg-success">Zakończone</span>
+
+  {% elif order.status == order.Status.CANCELLED %}
+    <span class="badge bg-danger">Odwołane</span>
+
+  {% else %}
+    <span class="badge bg-light text-dark">Inny</span>
+  {% endif %}
+</td>
+
                 <td>
                   {{ order.planned_date|date:"d.m.Y" }}
                 </td>

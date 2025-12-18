@@ -86,18 +86,6 @@
           {% endif %}
         </div>
 
-        {# ZREALIZUJ / PRZYWRÓĆ (tylko dla Realizacja/Zrealizowane; uprawnienia i tak pilnuje view) #}
-        {% if order.status == order.Status.IN_PROGRESS or order.status == order.Status.REALIZED %}
-        <form method="post" action="{% url 'core:workorder_toggle_realized' order.pk %}" class="mb-2">
-          {% csrf_token %}
-          {% if order.status == order.Status.IN_PROGRESS %}
-          <button class="btn btn-sm btn-success">ZREALIZUJ</button>
-          {% else %}
-          <button class="btn btn-sm btn-outline-secondary">PRZYWRÓĆ</button>
-          {% endif %}
-        </form>
-        {% endif %}
-
         <div class="mb-2">
           <span class="text-muted">Termin realizacji:</span>
           {{ order.planned_date|date:"d.m.Y" }}
