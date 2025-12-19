@@ -276,6 +276,7 @@ def api_pwa_workorders_dump(request):
             "status_label": wo.get_status_display(),
 
             "work_type_label": wo.get_work_type_display(),
+            "work_type_code": wo.work_type,
             "planned_date": wo.planned_date.isoformat() if wo.planned_date else None,
             "planned_time_from": wo.planned_time_from.strftime("%H:%M") if wo.planned_time_from else None,
             "planned_time_to": wo.planned_time_to.strftime("%H:%M") if wo.planned_time_to else None,

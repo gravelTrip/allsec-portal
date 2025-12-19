@@ -432,6 +432,112 @@
     }
   });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const workTypeEl =
+    document.getElementById("id_work_type") ||
+    document.querySelector('[name="work_type"]');
+
+  if (!workTypeEl) return;
+
+  const els = {
+    visitType: document.getElementById("id_visit_type") || document.querySelector('[name="visit_type"]'),
+    timeFrom: document.getElementById("id_planned_time_from") || document.querySelector('[name="planned_time_from"]'),
+    timeTo: document.getElementById("id_planned_time_to") || document.querySelector('[name="planned_time_to"]'),
+    requestedBy: document.getElementById("id_requested_by") || document.querySelector('[name="requested_by"]'),
+    title: document.getElementById("id_title") || document.querySelector('[name="title"]'),
+    desc: document.getElementById("id_description") || document.querySelector('[name="description"]'),
+  };
+
+  function wrapper(el) {
+    return el ? el.closest(".mb-3") : null;
+  }
+
+  function setWrapperDim(el, locked) {
+    const w = wrapper(el);
+    if (!w) return;
+    w.classList.toggle("opacity-50", locked);
+  }
+
+  // Shadow hidden input (żeby disabled nie czyścił wartości w POST)
+  function upsertShadow(control) {
+    if (!control || !control.name) return;
+    const form = control.form || document.querySelector("form");
+    if (!form) return;
+
+    let shadow = form.querySelector(`input[type="hidden"][data-shadow-for="${control.name}"]`);
+    if (!shadow) {
+      shadow = document.createElement("input");
+      shadow.type = "hidden";
+      shadow.name = control.name;
+      shadow.dataset.shadowFor = control.name;
+      control.insertAdjacentElement("afterend", shadow);
+    }
+    shadow.value = control.value ?? "";
+  }
+
+  function removeShadow(control) {
+    if (!control || !control.name) return;
+    const form = control.form || document.querySelector("form");
+    if (!form) return;
+
+    const shadow = form.querySelector(`input[type="hidden"][data-shadow-for="${control.name}"]`);
+    if (shadow) shadow.remove();
+  }
+
+  function setDisabledWithShadow(control, locked) {
+    if (!control) return;
+
+    // TomSelect (jeśli dotyczy)
+    if (control.tomselect) {
+      if (locked) control.tomselect.disable();
+      else control.tomselect.enable();
+    }
+
+    if (locked) {
+      upsertShadow(control);
+      control.disabled = true;
+    } else {
+      control.disabled = false;
+      removeShadow(control);
+    }
+
+    setWrapperDim(control, locked);
+  }
+
+  function setReadonlyGrey(control, locked) {
+    if (!control) return;
+
+    control.readOnly = locked;
+    control.classList.toggle("bg-light", locked);
+    control.classList.toggle("text-muted", locked);
+
+    // dla spójności wizualnej dimujemy też wrapper
+    setWrapperDim(control, locked);
+  }
+
+  function applyMaintenanceLocks() {
+    const isMaintenance = (workTypeEl.value === "MAINTENANCE");
+
+    // 1) Rodzaj wizyty (select) – disabled, ale z shadow hidden żeby nie czyścić
+    setDisabledWithShadow(els.visitType, isMaintenance);
+
+    // 2) Przedział godzinowy (time inputs) – disabled + shadow
+    setDisabledWithShadow(els.timeFrom, isMaintenance);
+    setDisabledWithShadow(els.timeTo, isMaintenance);
+
+    // 3) Osoba zgłaszająca (select) – disabled + shadow (żeby nie kasowało przy edycji)
+    setDisabledWithShadow(els.requestedBy, isMaintenance);
+
+    // 4) Tytuł i Opis – readonly + szarość (dalej się wysyła w POST, a autowypełnianie JS nadal może ustawić value)
+    setReadonlyGrey(els.title, isMaintenance);
+    setReadonlyGrey(els.desc, isMaintenance);
+  }
+
+  workTypeEl.addEventListener("change", applyMaintenanceLocks);
+  applyMaintenanceLocks();
+});
+</script>
 
 
 {% endblock %}

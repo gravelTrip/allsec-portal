@@ -279,12 +279,26 @@ function renderWorkorderCard(wo) {
 
   const timeLine = `${wo.planned_time_from || ""}${wo.planned_time_to ? "–" + wo.planned_time_to : ""}`;
 
+  const stClass =
+    wo.status_code === "IN_PROGRESS" ? "text-bg-success" :
+    wo.status_code === "REALIZED" ? "text-bg-danger" :
+    "text-bg-secondary";
+
+  const wtCode =
+    wo.work_type_code ||
+    (wo.service_report_id ? "SERVICE" : null);
+
+  const wtClass =
+    wtCode === "MAINTENANCE" ? "text-bg-info" :
+    wtCode === "SERVICE" ? "text-bg-primary" :
+    "text-bg-secondary";
+
   const badges = [
-    `<span class="badge text-bg-secondary">${wo.status_label || ""}</span>`,
-    `<span class="badge text-bg-info">${wo.work_type_label || ""}</span>`,
-    ...(wo.system_badges || []).map(lbl => `<span class="badge text-bg-light border text-dark">${lbl}</span>`),
-    wo.system_badges_more ? `<span class="badge text-bg-light border text-dark">+${wo.system_badges_more}</span>` : ""
-  ].join(" ");
+    `<span class="badge ${stClass}">${esc(wo.status_label || "")}</span>`,
+    `<span class="badge ${wtClass}">${esc(wo.work_type_label || "")}</span>`,
+    ...(wo.system_badges || []).map(b => `<span class="badge text-bg-light border">${esc(b)}</span>`),
+  ].filter(Boolean);
+
 
   return `
     <a class="card pwa-card text-decoration-none text-dark" href="/pwa/zlecenia/${wo.id}/">

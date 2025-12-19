@@ -44,46 +44,48 @@
         <div class="mb-2">
           <span class="text-muted">Typ:</span>
           {% if order.work_type == order.WorkOrderType.SERVICE %}
-          <span class="badge bg-danger ms-1">Serwis</span>
-          {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-          <span class="badge bg-info text-dark ms-1">Przegląd</span>
-          {% elif order.work_type == order.WorkOrderType.JOB %}
-          <span class="badge bg-secondary ms-1">Robota</span>
-          {% else %}
-          <span class="badge bg-light text-dark ms-1">Inne</span>
-          {% endif %}
+  <span class="badge bg-primary ms-1">Serwis</span>
+{% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+  <span class="badge bg-info text-dark ms-1">Konserwacja</span>
+{% elif order.work_type == order.WorkOrderType.JOB %}
+  <span class="badge bg-secondary ms-1">Montaż</span>
+{% else %}
+  <span class="badge bg-light text-dark border ms-1">Inne</span>
+{% endif %}
+
         </div>
 
         <div class="mb-2">
           <span class="text-muted small">Status:</span>
 
           {% if order.status == order.Status.NEW %}
-          <span class="badge bg-primary">Do umówienia</span>
+  <span class="badge bg-light text-dark border">Do umówienia</span>
 
-          {% elif order.status == order.Status.SCHEDULED %}
-          <span class="badge bg-info text-dark">Umówione</span>
+{% elif order.status == order.Status.SCHEDULED %}
+  <span class="badge bg-secondary">Umówione</span>
 
-          {% elif order.status == order.Status.IN_PROGRESS %}
-          <span class="badge bg-warning text-dark">Realizacja</span>
+{% elif order.status == order.Status.IN_PROGRESS %}
+  <span class="badge bg-success">Realizacja</span>
 
-          {% elif order.status == order.Status.REALIZED %}
-          <span class="badge bg-primary">Zrealizowane</span>
+{% elif order.status == order.Status.REALIZED %}
+  <span class="badge bg-danger">Zrealizowane</span>
 
-          {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-          <span class="badge bg-secondary">Decyzja</span>
+{% elif order.status == order.Status.WAITING_FOR_DECISION %}
+  <span class="badge bg-warning text-dark">Decyzja</span>
 
-          {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-          <span class="badge bg-secondary">Materiał</span>
+{% elif order.status == order.Status.WAITING_FOR_PARTS %}
+  <span class="badge bg-warning text-dark">Materiał</span>
 
-          {% elif order.status == order.Status.COMPLETED %}
-          <span class="badge bg-success">Zakończone</span>
+{% elif order.status == order.Status.COMPLETED %}
+  <span class="badge bg-dark">Zakończone</span>
 
-          {% elif order.status == order.Status.CANCELLED %}
-          <span class="badge bg-danger">Odwołane</span>
+{% elif order.status == order.Status.CANCELLED %}
+  <span class="badge bg-dark">Odwołane</span>
 
-          {% else %}
-          <span class="badge bg-light text-dark">Inny</span>
-          {% endif %}
+{% else %}
+  <span class="badge bg-light text-dark border">Inny</span>
+{% endif %}
+
         </div>
 
         <div class="mb-2">

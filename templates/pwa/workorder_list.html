@@ -38,17 +38,30 @@
                     </div>
                 </div>
 
-                <div class="mt-2">
-                    <span class="badge text-bg-secondary">{{ wo.get_status_display }}</span>
-                    <span class="badge text-bg-info">{{ wo.get_work_type_display }}</span>
-                    {% for lbl in wo.pwa_system_badges %}
-                    <span class="badge text-bg-light border text-dark">{{ lbl }}</span>
-                    {% endfor %}
-                    {% if wo.pwa_system_badges_more %}
-                    <span class="badge text-bg-light border text-dark">+{{ wo.pwa_system_badges_more }}</span>
-                    {% endif %}
+                <div class="d-flex flex-wrap gap-1 mb-2">
 
-                </div>
+  {# STATUS: Realizacja=success, Zrealizowane=danger #}
+  {% if wo.status == wo.Status.IN_PROGRESS %}
+    <span class="badge text-bg-success">{{ wo.get_status_display }}</span>
+  {% elif wo.status == wo.Status.REALIZED %}
+    <span class="badge text-bg-danger">{{ wo.get_status_display }}</span>
+  {% else %}
+    <span class="badge text-bg-secondary">{{ wo.get_status_display }}</span>
+  {% endif %}
+
+  {# TYP: konserwacja=info, serwis=primary #}
+  {% if wo.work_type == "MAINTENANCE" %}
+    <span class="badge text-bg-info">{{ wo.get_work_type_display }}</span>
+  {% elif wo.work_type == "SERVICE" %}
+    <span class="badge text-bg-primary">{{ wo.get_work_type_display }}</span>
+  {% else %}
+    <span class="badge text-bg-secondary">{{ wo.get_work_type_display }}</span>
+  {% endif %}
+
+  {% for b in wo.pwa_system_badges %}
+    <span class="badge text-bg-light border">{{ b }}</span>
+  {% endfor %}
+</div>
             </div>
         </a>
         {% endfor %}
