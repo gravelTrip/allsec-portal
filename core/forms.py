@@ -16,6 +16,9 @@ from .models import (
     MaintenanceCheckItem,
 )
 
+import re
+
+
 
 class WorkOrderForm(forms.ModelForm):
     # systems – backendowo tylko do walidacji, HTML rysujemy sami (checkboxy + JS)
@@ -451,6 +454,15 @@ class SiteForm(forms.ModelForm):
             )
 
 class EntityForm(forms.ModelForm):
+    """
+    Dane FV – walidacja zgodnie z wymaganiami:
+    - name, street, postal_code, city: wymagane
+    - postal_code: format XX-XXX (lub 5 cyfr -> autoformat)
+    - co najmniej jedno z: NIP / REGON / PESEL
+    - długości po normalizacji do cyfr: NIP=10, REGON=9/14, PESEL=11
+    - zapisujemy NIP/REGON/PESEL jako same cyfry (spójność danych)
+    """
+
     class Meta:
         model = Entity
         fields = [
@@ -465,34 +477,109 @@ class EntityForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "type": forms.Select(
-                attrs={"class": "form-select form-select-sm"}
-            ),
-            "nip": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "regon": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "pesel": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "street": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "postal_code": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "city": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "notes": forms.Textarea(
-                attrs={"class": "form-control form-control-sm", "rows": 3}
-            ),
+            "name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "type": forms.Select(attrs={"class": "form-select form-select-sm"}),
+            "nip": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "regon": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "pesel": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "street": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "postal_code": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "city": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "notes": forms.Textarea(attrs={"class": "form-control form-control-sm", "rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # wymagane pola adresowe (na poziomie formularza, bez zmiany modelu)
+        self.fields["street"].required = True
+        self.fields["postal_code"].required = True
+        self.fields["city"].required = True
+
+        # małe podpowiedzi UX (opcjonalnie)
+        self.fields["postal_code"].widget.attrs.setdefault("placeholder", "np. 80-123")
+        self.fields["nip"].widget.attrs.setdefault("placeholder", "10 cyfr")
+        self.fields["regon"].widget.attrs.setdefault("placeholder", "9 lub 14 cyfr")
+        self.fields["pesel"].widget.attrs.setdefault("placeholder", "11 cyfr")
+
+    def clean(self):
+        cleaned = super().clean()
+
+        def _strip(v: str) -> str:
+            return (v or "").strip()
+
+        def _only_digits(v: str) -> str:
+            # normalizacja: zostawiamy tylko cyfry (usuwa spacje, myślniki itp.)
+            return re.sub(r"\D+", "", v or "")
+
+        # --- wymagane pola tekstowe: bez samych spacji
+        name = _strip(cleaned.get("name"))
+        street = _strip(cleaned.get("street"))
+        city = _strip(cleaned.get("city"))
+
+        if not name:
+            self.add_error("name", "Nazwa jest wymagana.")
+        else:
+            cleaned["name"] = name
+
+        if not street:
+            self.add_error("street", "Ulica i nr są wymagane.")
+        else:
+            cleaned["street"] = street
+
+        if not city:
+            self.add_error("city", "Miejscowość jest wymagana.")
+        else:
+            cleaned["city"] = city
+
+        # --- kod pocztowy: XX-XXX (lub 5 cyfr -> autoformat)
+        postal = _strip(cleaned.get("postal_code"))
+        if not postal:
+            self.add_error("postal_code", "Kod pocztowy jest wymagany.")
+        else:
+            digits = _only_digits(postal)
+            if len(digits) == 5 and ("-" not in postal):
+                postal = f"{digits[:2]}-{digits[2:]}"
+            if not re.fullmatch(r"\d{2}-\d{3}", postal):
+                self.add_error("postal_code", "Kod pocztowy musi mieć format XX-XXX (np. 80-123).")
+            else:
+                cleaned["postal_code"] = postal
+
+        # --- NIP / REGON / PESEL: co najmniej jedno + długości
+        nip_raw = _strip(cleaned.get("nip"))
+        regon_raw = _strip(cleaned.get("regon"))
+        pesel_raw = _strip(cleaned.get("pesel"))
+
+        nip_digits = _only_digits(nip_raw)
+        regon_digits = _only_digits(regon_raw)
+        pesel_digits = _only_digits(pesel_raw)
+
+        if not (nip_digits or regon_digits or pesel_digits):
+            msg = "Wypełnij przynajmniej jedno: NIP / REGON / PESEL."
+            self.add_error("nip", msg)
+            self.add_error("regon", msg)
+            self.add_error("pesel", msg)
+        else:
+            if nip_raw:
+                # jeżeli ktoś wpisał litery, po normalizacji liczba cyfr może wyjść 0 -> traktujemy jako błąd
+                if len(nip_digits) != 10:
+                    self.add_error("nip", "NIP musi mieć 10 cyfr.")
+                else:
+                    cleaned["nip"] = nip_digits
+
+            if regon_raw:
+                if len(regon_digits) not in (9, 14):
+                    self.add_error("regon", "REGON musi mieć 9 lub 14 cyfr.")
+                else:
+                    cleaned["regon"] = regon_digits
+
+            if pesel_raw:
+                if len(pesel_digits) != 11:
+                    self.add_error("pesel", "PESEL musi mieć 11 cyfr.")
+                else:
+                    cleaned["pesel"] = pesel_digits
+
+        return cleaned
 
 
 class ManagerForm(forms.ModelForm):

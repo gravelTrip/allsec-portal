@@ -7,14 +7,14 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import date, timedelta
 from django.http import HttpResponseForbidden, JsonResponse
-from django.db.models import Sum
+from django.db.models import Sum, Q
 
 from django.urls import reverse
 
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
-
+import re
 
 from django.conf import settings
 
@@ -1539,20 +1539,78 @@ def service_report_pdf(request, pk):
 # DANE FAKTUROWE (Entity)
 # =========================
 
-@login_required
 def entity_list(request):
-    qs = Entity.objects.order_by("name")
+    qs = Entity.objects.all()
+
+    # --- Filtry (bez zapamiętywania; tylko GET)
+    f_name = (request.GET.get("name") or "").strip()
+    f_type = (request.GET.get("type") or "").strip()
+    f_city = (request.GET.get("city") or "").strip()
+    f_ident = (request.GET.get("ident") or "").strip()
+
+    if f_name:
+        qs = qs.filter(name__icontains=f_name)
+
+    if f_type:
+        qs = qs.filter(type=f_type)
+
+    if f_city:
+        # miasto z selecta (dokładne), ale tolerujemy różnice wielkości liter
+        qs = qs.filter(city__iexact=f_city)
+
+    if f_ident:
+        ident_digits = re.sub(r"\D+", "", f_ident)
+        needle = ident_digits if ident_digits else f_ident
+        qs = qs.filter(
+            Q(nip__icontains=needle) |
+            Q(regon__icontains=needle) |
+            Q(pesel__icontains=needle)
+        )
+
+    qs = qs.order_by("name")
+
     paginator = Paginator(qs, 25)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+
+    can_office = is_office(request.user)
+
+    # --- Listy do selectów (TomSelect)
+    type_choices = [{"value": v, "label": l} for v, l in Entity.EntityType.choices]
+    city_choices = list(
+        Entity.objects.exclude(city="")
+        .exclude(city__isnull=True)
+        .values_list("city", flat=True)
+        .order_by("city")
+        .distinct()
+    )
+
+    # --- querystring do paginacji (zachowaj filtry)
+    qs_params = request.GET.copy()
+    qs_params.pop("page", None)
+    qs_base = qs_params.urlencode()
 
     context = {
         "entities": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
-        "can_create": is_office(request.user),
+        "can_create": can_office,
+        "can_edit": can_office,
+        "can_delete": can_office,
+
+        "filters": {
+            "name": f_name,
+            "type": f_type,
+            "city": f_city,
+            "ident": f_ident,
+        },
+        "type_choices": type_choices,
+        "city_choices": city_choices,
+        "qs_base": qs_base,
     }
     return render(request, "core/entity_list.html", context)
+
+
 
 
 @login_required
@@ -1608,19 +1666,6 @@ def entity_edit(request, pk):
     }
     return render(request, "core/entity_form.html", context)
 
-
-@login_required
-def entity_delete(request, pk):
-    entity = get_object_or_404(Entity, pk=pk)
-
-    if not is_office(request.user):
-        return HttpResponseForbidden("Brak uprawnień do usuwania danych FV.")
-
-    if request.method == "POST":
-        entity.delete()
-        return redirect("core:entity_list")
-
-    return redirect("core:entity_detail", pk=pk)
 
 @login_required
 def site_contacts_json(request, site_id):

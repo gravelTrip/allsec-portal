@@ -82,7 +82,6 @@ urlpatterns = [
     path("dane-fv/nowe/", views.entity_create, name="entity_create"),
     path("dane-fv/<int:pk>/", views.entity_detail, name="entity_detail"),
     path("dane-fv/<int:pk>/edytuj/", views.entity_edit, name="entity_edit"),
-    path("dane-fv/<int:pk>/usun/", views.entity_delete, name="entity_delete"),
 
 
     # Zarządcy

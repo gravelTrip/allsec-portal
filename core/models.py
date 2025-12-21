@@ -94,7 +94,7 @@ class Site(models.Model):
 
     entity = models.ForeignKey(
         Entity,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="sites",
         verbose_name="Dane fakturowe",
     )
@@ -435,7 +435,7 @@ class System(models.Model):
 
     site = models.ForeignKey(
         Site,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="systems",
         verbose_name="Obiekt",
     )
@@ -550,7 +550,7 @@ class Job(models.Model):
 
     site = models.ForeignKey(
         Site,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="jobs",
         verbose_name="Obiekt",
     )
@@ -697,7 +697,7 @@ class WorkOrder(models.Model):
 
     site = models.ForeignKey(
         Site,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="work_orders",
         verbose_name="Obiekt",
     )
@@ -913,7 +913,7 @@ class MaintenanceProtocol(models.Model):
 
     site = models.ForeignKey(
         Site,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="maintenance_protocols",
         verbose_name="Obiekt",
     )

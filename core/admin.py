@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
 from django import forms
+from django.db.models import Count
 
 from .models import (
     Entity,
@@ -20,16 +21,44 @@ from .models import (
 )
 
 
+class NoBulkDeleteMixin:
+    """Usuwa akcję 'Usuń zaznaczone' (najczęstsza przyczyna wypadków)."""
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        actions.pop("delete_selected", None)
+        return actions
+
+
+class SuperuserDeleteOnlyMixin:
+    """Opcjonalnie: kasowanie tylko dla superusera."""
+    def has_delete_permission(self, request, obj=None):
+        if not request.user.is_superuser:
+            return False
+        return super().has_delete_permission(request, obj=obj)
 
 
 
 
 # Register your models here.
 @admin.register(Entity)
-class EntityAdmin(admin.ModelAdmin):
-    list_display = ("name", "type", "nip", "regon", "pesel", "city", "updated_at")
+class EntityAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
+    list_display = ("name", "type", "nip", "regon", "pesel", "city", "sites_count", "updated_at")
     search_fields = ("name", "nip", "regon", "pesel", "city")
     list_filter = ("type",)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(_sites_count=Count("sites", distinct=True))
+
+    @admin.display(description="Obiekty", ordering="_sites_count")
+    def sites_count(self, obj):
+        return getattr(obj, "_sites_count", 0)
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        # ✅ usuń masowe kasowanie (najczęstszy „wypadek”)
+        actions.pop("delete_selected", None)
+        return actions
 
 
 class SiteContactInline(admin.TabularInline):
@@ -101,7 +130,7 @@ class ManagerAdmin(admin.ModelAdmin):
 
     
 @admin.register(Site)
-class SiteAdmin(admin.ModelAdmin):
+class SiteAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
     list_display = ("name", "entity", "manager", "city", "site_type", "google_maps_link", "updated_at")
     search_fields = ("name", "city", "entity__name", "manager__short_name", "manager__full_name")
     list_filter = ("site_type", "city", "manager")
@@ -130,7 +159,7 @@ class ContactAdmin(admin.ModelAdmin):
 
 
 @admin.register(System)
-class SystemAdmin(admin.ModelAdmin):
+class SystemAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
     list_display = ("name", "site", "system_type", "manufacturer", "model", "updated_at")
     search_fields = ("name", "site__name", "manufacturer", "model")
     list_filter = ("system_type", "manufacturer")
@@ -144,7 +173,7 @@ class SystemAdmin(admin.ModelAdmin):
 
 
 @admin.register(Job)
-class JobAdmin(admin.ModelAdmin):
+class JobAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
     list_display = (
         "title",
         "site",
@@ -241,7 +270,7 @@ class WorkOrderAdminForm(forms.ModelForm):
 
 
 @admin.register(WorkOrder)
-class WorkOrderAdmin(admin.ModelAdmin):
+class WorkOrderAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
     form = WorkOrderAdminForm
 
     list_display = (
@@ -339,7 +368,7 @@ class ServiceReportAdmin(admin.ModelAdmin):
     )
 
 @admin.register(MaintenanceProtocol)
-class MaintenanceProtocolAdmin(admin.ModelAdmin):
+class MaintenanceProtocolAdmin(NoBulkDeleteMixin, SuperuserDeleteOnlyMixin, admin.ModelAdmin):
     list_display = (
         "number",
         "site",

@@ -12,13 +12,68 @@
     </div>
 
     {% if can_create %}
-      <a href="{% url 'core:entity_create' %}" class="btn btn-primary btn-sm">
+      <a href="{% url 'core:entity_create' %}" class="btn btn-success btn-sm">
         + Nowe dane FV
       </a>
     {% endif %}
   </div>
 
   <div class="card shadow-sm border-0">
+
+  <div class="card-header bg-white">
+    <form method="get" id="entity-filters-form" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label form-label-sm mb-1">Nazwa</label>
+        <input type="search"
+                name="name"
+                value="{{ filters.name }}"
+                class="form-control form-control-sm entity-filter-text"
+                placeholder="Szukaj po nazwie…">
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Typ</label>
+        <select name="type" id="entity-filter-type" class="form-select form-select-sm">
+          <option value="">Wszystkie</option>
+          {% for t in type_choices %}
+            <option value="{{ t.value }}" {% if t.value == filters.type %}selected{% endif %}>
+              {{ t.label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Miasto</label>
+        <select name="city" id="entity-filter-city" class="form-select form-select-sm">
+          <option value="">Wszystkie</option>
+          {% for c in city_choices %}
+            <option value="{{ c }}" {% if c == filters.city %}selected{% endif %}>
+              {{ c }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label form-label-sm mb-1">NIP / REGON / PESEL</label>
+        <input type="search"
+                name="ident"
+                value="{{ filters.ident }}"
+                class="form-control form-control-sm entity-filter-text"
+                placeholder="np. 123…">
+      </div>
+
+      <div class="col-12 d-flex justify-content-end mt-1">
+        <a href="{% url 'core:entity_list' %}" class="btn btn-sm btn-outline-secondary">
+          Resetuj
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card-body p-0">
+
     <div class="card-body p-0">
       <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
@@ -27,26 +82,43 @@
             <th>Typ</th>
             <th>Miasto</th>
             <th>NIP</th>
-            <th></th>
+            <th class="text-end"></th>
           </tr>
         </thead>
         <tbody>
           {% if entities %}
             {% for entity in entities %}
               <tr>
-                <td>{{ entity.name }}</td>
+                <!-- Nazwa: klikalna do podglądu, bez "stylu linka" -->
+                <td>
+                  <a href="{% url 'core:entity_detail' entity.pk %}"
+                     class="text-reset text-decoration-none fw-semibold"
+                     title="{{ entity.name }}">
+                    {{ entity.name }}
+                  </a>
+                </td>
+
                 <td>{{ entity.get_type_display }}</td>
+
                 <td>
                   <span class="small text-muted">
                     {{ entity.city }}
                   </span>
                 </td>
+
                 <td>{{ entity.nip }}</td>
+
+                <!-- Akcje: edycja -->
                 <td class="text-end">
-                  <a href="{% url 'core:entity_detail' entity.pk %}"
-                     class="btn btn-sm btn-primary">
-                    Szczegóły
-                  </a>
+                  <div class="d-inline-flex align-items-center gap-1">
+                    {% if can_edit %}
+                      <a href="{% url 'core:entity_edit' entity.pk %}"
+                        class="btn btn-sm btn-primary btn-icon-square"
+                        title="Edytuj">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                    {% endif %}
+                  </div>
                 </td>
               </tr>
             {% endfor %}
@@ -67,7 +139,7 @@
           <ul class="pagination pagination-sm mb-0 justify-content-end">
             {% if page_obj.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+                <a class="page-link" href="{% if qs_base %}?{{ qs_base }}&page={{ page_obj.previous_page_number }}{% else %}?page={{ page_obj.previous_page_number }}{% endif %}">«</a>
               </li>
             {% else %}
               <li class="page-item disabled">
@@ -77,13 +149,17 @@
 
             {% for num in page_obj.paginator.page_range %}
               <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                <a class="page-link"
+   href="{% if qs_base %}?{{ qs_base }}&page={{ num }}{% else %}?page={{ num }}{% endif %}">{{ num }}</a>
+
               </li>
             {% endfor %}
 
             {% if page_obj.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+                <a class="page-link"
+   href="{% if qs_base %}?{{ qs_base }}&page={{ page_obj.next_page_number }}{% else %}?page={{ page_obj.next_page_number }}{% endif %}">»</a>
+
               </li>
             {% else %}
               <li class="page-item disabled">
@@ -95,4 +171,79 @@
       </div>
     {% endif %}
   </div>
+
+ 
+
+
+
+  <script>
+(function () {
+  const form = document.getElementById("entity-filters-form");
+  if (!form) return;
+
+  const DELAY_MS = 900;     // było 350 – za szybko
+  const MIN_CHARS = 2;      // nie submituj po 1 znaku
+
+  const submitNow = () => {
+    if (form.requestSubmit) form.requestSubmit();
+    else form.submit();
+  };
+
+  // select -> submit od razu (TomSelect nie powinien tego triggerować przy samym pisaniu)
+  form.querySelectorAll("select").forEach(sel => {
+    sel.addEventListener("change", submitNow);
+  });
+
+  // input -> debounce (TYLKO dla naszych pól tekstowych)
+  let t = null;
+  form.querySelectorAll(".entity-filter-text").forEach(inp => {
+    const schedule = () => {
+      const val = (inp.value || "").trim();
+
+      // jeśli coś wpisujesz i masz 1 znak – czekamy aż będzie MIN_CHARS
+      if (val.length > 0 && val.length < MIN_CHARS) return;
+
+      clearTimeout(t);
+      t = setTimeout(submitNow, DELAY_MS);
+    };
+
+    inp.addEventListener("input", (e) => {
+      if (e.isComposing) return; // IME safe
+      schedule();
+    });
+
+    // Enter -> od razu filtruj (bez czekania)
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        clearTimeout(t);
+        submitNow();
+      }
+    });
+  });
+
+  // TomSelect (tylko tu)
+  if (window.TomSelect) {
+    const typeSel = document.getElementById("entity-filter-type");
+    const citySel = document.getElementById("entity-filter-city");
+
+    if (typeSel && !typeSel.tomselect) {
+      new TomSelect(typeSel, {
+        allowEmptyOption: true,
+        placeholder: "Wszystkie",
+        plugins: ["clear_button"]
+      });
+    }
+    if (citySel && !citySel.tomselect) {
+      new TomSelect(citySel, {
+        allowEmptyOption: true,
+        placeholder: "Wszystkie",
+        plugins: ["clear_button"]
+      });
+    }
+  }
+})();
+</script>
+
+
 {% endblock %}
