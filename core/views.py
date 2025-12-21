@@ -367,60 +367,256 @@ def dashboard(request):
     }
     return render(request, "core/dashboard.html", context)
 
+# --- DODAJ TEN HELPER (np. pod dashboard(), przed workorder_list) ---
+from datetime import date, timedelta  # upewnij się, że masz importy u góry
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+def _apply_workorder_filters(
+    request,
+    qs,
+    *,
+    include_type=False,
+    include_site=False,
+    default_time="all",
+):
+    """
+    Wspólna logika filtrów (Dashboard-style).
+
+    Parametry GET:
+      - type (opcjonalnie)
+      - site (opcjonalnie)
+      - assignee
+      - status
+      - time: all|week|month|year|range
+      - date_from/date_to (ISO: YYYY-MM-DD) dla range
+      - hide_completed: 1 (jeśli brak parametru => domyślnie TRUE)
+    Zwraca: (przefiltrowany_qs, order_filters_dict)
+    """
+    User = get_user_model()
+    today = timezone.localdate()
+
+    # --- pobranie parametrów ---
+    type_param = request.GET.get("type", "").strip() if include_type else ""
+    site_param = request.GET.get("site", "").strip() if include_site else ""
+
+    assignee_param = request.GET.get("assignee", "").strip()
+    status_param = request.GET.get("status", "").strip()
+
+    time_param = (request.GET.get("time", "") or "").strip() or default_time
+    date_from_str = (request.GET.get("date_from", "") or "").strip()
+    date_to_str = (request.GET.get("date_to", "") or "").strip()
+
+    # checkbox (jak brak w URL -> domyślnie ukrywamy zakończone/odwołane)
+    if "hide_completed" in request.GET:
+        hide_completed = request.GET.get("hide_completed") in ("1", "true", "on", "yes")
+    else:
+        hide_completed = True
+
+    # --- walidacja: type/status ---
+    valid_work_types = {c[0] for c in WorkOrder.WorkOrderType.choices}
+    valid_statuses = {c[0] for c in WorkOrder.Status.choices}
+
+    # --- filtry: type / site / assignee / status ---
+    if include_type and type_param in valid_work_types:
+        qs = qs.filter(work_type=type_param)
+    elif include_type:
+        type_param = ""
+
+    if include_site and site_param:
+        try:
+            qs = qs.filter(site_id=int(site_param))
+        except (TypeError, ValueError):
+            site_param = ""
+
+    if assignee_param:
+        try:
+            qs = qs.filter(assigned_to_id=int(assignee_param))
+        except (TypeError, ValueError):
+            assignee_param = ""
+
+    if status_param in valid_statuses:
+        qs = qs.filter(status=status_param)
+    else:
+        status_param = ""
+
+    # --- filtr czasu (tak jak dashboard: tydzień/miesiąc/rok lub range) ---
+    if time_param == "week":
+        start_of_week = today - timedelta(days=today.weekday())
+        end_of_week = start_of_week + timedelta(days=6)
+        qs = qs.filter(planned_date__range=(start_of_week, end_of_week))
+
+    elif time_param == "month":
+        qs = qs.filter(planned_date__year=today.year, planned_date__month=today.month)
+
+    elif time_param == "year":
+        qs = qs.filter(planned_date__year=today.year)
+
+    elif time_param == "range":
+        try:
+            df = date.fromisoformat(date_from_str) if date_from_str else None
+        except ValueError:
+            df = None
+            date_from_str = ""
+        try:
+            dt = date.fromisoformat(date_to_str) if date_to_str else None
+        except ValueError:
+            dt = None
+            date_to_str = ""
+
+        if df and dt:
+            qs = qs.filter(planned_date__range=(df, dt))
+        elif df:
+            qs = qs.filter(planned_date__gte=df)
+        elif dt:
+            qs = qs.filter(planned_date__lte=dt)
+
+    elif time_param == "all":
+        pass
+    else:
+        time_param = default_time
+
+    # --- ukrywanie zakończonych/odwołanych na liście (COMPLETED + CANCELLED) ---
+    if hide_completed:
+        qs = qs.exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+
+    # --- choices do selectów ---
+
+    # Obiekty
+    site_choices = []
+    if include_site:
+        sites_qs = Site.objects.order_by("name")
+        for s in sites_qs:
+            label = s.name
+            if getattr(s, "city", None):
+                label = f"{label} ({s.city})"
+            site_choices.append({
+                "id": str(s.id),
+                "label": label,
+                "selected": (str(s.id) == site_param),
+            })
+
+    # Serwisanci (tylko ci, którzy występują w zleceniach)
+    assignee_ids = (
+        WorkOrder.objects
+        .exclude(assigned_to__isnull=True)
+        .values_list("assigned_to_id", flat=True)
+        .distinct()
+    )
+    assignee_qs = User.objects.filter(id__in=assignee_ids).order_by("first_name", "last_name", "username")
+    assignee_choices = []
+    for u in assignee_qs:
+        label = (u.get_full_name() or "").strip() or u.username
+        assignee_choices.append({
+            "id": str(u.id),
+            "label": label,
+            "selected": (str(u.id) == assignee_param),
+        })
+
+    # Status
+    status_choices = []
+    for value, label in WorkOrder.Status.choices:
+        status_choices.append({
+            "value": value,
+            "label": label,
+            "selected": (value == status_param),
+        })
+
+    # Time
+    time_raw_choices = [
+        ("all", "Wszystkie"),
+        ("week", "Tydzień"),
+        ("month", "Miesiąc"),
+        ("year", "Rok"),
+        ("range", "Zakres dat"),
+    ]
+    time_choices = []
+    for value, label in time_raw_choices:
+        time_choices.append({
+            "value": value,
+            "label": label,
+            "selected": (value == time_param),
+        })
+
+    order_filters = {
+        "site": site_param,
+        "assignee": assignee_param,
+        "status": status_param,
+        "time": time_param,
+        "date_from": date_from_str,
+        "date_to": date_to_str,
+        "hide_completed": hide_completed,
+
+        "site_choices": site_choices,
+        "assignee_choices": assignee_choices,
+        "status_choices": status_choices,
+        "time_choices": time_choices,
+    }
+
+    if include_type:
+        type_choices = []
+        for value, label in WorkOrder.WorkOrderType.choices:
+            type_choices.append({
+                "value": value,
+                "label": label,
+                "selected": (value == type_param),
+            })
+        order_filters["type"] = type_param
+        order_filters["type_choices"] = type_choices
+
+    return qs, order_filters
 
 
+
+# --- PODMIEŃ CAŁĄ FUNKCJĘ workorder_list NA PONIŻSZĄ ---
 @login_required
 def workorder_list(request):
     qs = (
         WorkOrder.objects
         .select_related("site", "assigned_to")
-        .prefetch_related("systems")
         .order_by("-created_at")
     )
 
-    filter_work_type = request.GET.get("work_type", "")
-    filter_status = request.GET.get("status", "")
-    show_closed = request.GET.get("show_closed") == "on"
+    # Dashboard-style filtry + Obiekt zamiast Typu
+    qs, order_filters = _apply_workorder_filters(
+        request,
+        qs,
+        include_site=True,
+        default_time="all",
+    )
 
-    if filter_work_type:
-        qs = qs.filter(work_type=filter_work_type)
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    orders = page_obj.object_list
 
-    if filter_status:
-        qs = qs.filter(status=filter_status)
-    else:
-        if not show_closed:
-            qs = qs.exclude(status__in=[WorkOrder.Status.COMPLETED, WorkOrder.Status.CANCELLED])
+    # querystring do paginacji (bez page)
+    params = request.GET.copy()
+    params.pop("page", None)
+    querystring = params.urlencode()
 
-    paginator = Paginator(qs, 30)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-
-    work_type_choices = [("", "Typ: wszystkie")] + list(WorkOrder.WorkOrderType.choices)
-    status_choices = [("", "Status: wszystkie")] + list(WorkOrder.Status.choices)
-
+    # powiadomienia tylko dla biura (i poprawne nazwy pól relacji)
     unread_events_count = 0
     recent_events = []
     if is_office(request.user):
         unread_events_count = WorkOrderEvent.objects.filter(is_read=False).count()
         recent_events = list(
-            WorkOrderEvent.objects.select_related("work_order", "actor")[:10]
+            WorkOrderEvent.objects.select_related("work_order", "actor").order_by("-created_at")[:10]
         )
 
     context = {
-        "orders": page_obj.object_list,
+        "orders": orders,
         "page_obj": page_obj,
         "paginator": paginator,
-        "work_type_choices": work_type_choices,
-        "status_choices": status_choices,
-        "filter_work_type": filter_work_type,
-        "filter_status": filter_status,
-        "show_closed": show_closed,
+        "querystring": querystring,
+
+        "order_filters": order_filters,
         "can_create": is_office(request.user),
 
         "unread_events_count": unread_events_count,
         "recent_events": recent_events,
     }
     return render(request, "core/workorder_list.html", context)
+
 
 
 

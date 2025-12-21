@@ -11,57 +11,98 @@
     </p>
   </div>
 
-  <div class="d-flex align-items-center gap-2">
-    <form method="get" class="d-flex align-items-center gap-2 mb-0">
-      <div class="form-check form-check-inline ms-2 mb-0" style="white-space: nowrap;">
-        {% if show_closed %}
-        <input class="form-check-input" type="checkbox" id="show_closed" name="show_closed" {% if show_closed %}checked{% endif %}>
-        {% else %}
-        <input class="form-check-input" type="checkbox" id="show_closed" name="show_closed">
-        {% endif %}
-
-        <label class="form-check-label small" for="show_closed">
-          Pokaż zakończone / odwołane
-        </label>
-      </div>
-
-      <select name="work_type" class="form-select form-select-sm">
-        {% for value, label in work_type_choices %}
-        <option value="{{ value }}" {% if value == filter_work_type %}selected{% endif %}>
-          {{ label }}
-        </option>
-        {% endfor %}
-      </select>
-
-      <select name="status" class="form-select form-select-sm">
-        {% for value, label in status_choices %}
-        <option value="{{ value }}" {% if value == filter_status %}selected{% endif %}>
-          {{ label }}
-        </option>
-        {% endfor %}
-      </select>
-
-      <button class="btn btn-sm btn-outline-secondary" type="submit">
-        Filtruj
-      </button>
-
-      {% if filter_work_type or filter_status or show_closed %}
-      <a href="{% url 'core:workorder_list' %}" class="btn btn-sm btn-link">
-        Wyczyść
-      </a>
-      {% endif %}
-    </form>
-
-    {% if can_create %}
-    <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-success">
-      Nowe zlecenie
-    </a>
-    {% endif %}
-  </div>
+  {% if can_create %}
+  <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-success">
+    Nowe zlecenie
+  </a>
+  {% endif %}
 </div>
 
-
 <div class="card shadow-sm border-0">
+  <div class="card-header bg-white">
+    <form method="get" id="workorder-list-filters" class="row g-2 align-items-end">
+      <!-- Obiekt -->
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Obiekt</label>
+        <select name="site" class="form-select form-select-sm">
+          <option value="">Wszystkie</option>
+          {% for s in order_filters.site_choices %}
+          <option value="{{ s.id }}" {% if s.selected %} selected{% endif %}>
+            {{ s.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Serwisant -->
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Serwisant</label>
+        <select name="assignee" class="form-select form-select-sm">
+          <option value="">Wszyscy</option>
+          {% for u in order_filters.assignee_choices %}
+          <option value="{{ u.id }}" {% if u.selected %} selected{% endif %}>
+            {{ u.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Status -->
+      <div class="col-md-2">
+        <label class="form-label form-label-sm mb-1">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="">Wszystkie</option>
+          {% for s in order_filters.status_choices %}
+          <option value="{{ s.value }}" {% if s.selected %} selected{% endif %}>
+            {{ s.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Czas -->
+      <div class="col-md-2">
+        <label class="form-label form-label-sm mb-1">Czas</label>
+        <select name="time" class="form-select form-select-sm" id="workorder-list-filter-time">
+          {% for t in order_filters.time_choices %}
+          <option value="{{ t.value }}" {% if t.selected %} selected{% endif %}>
+            {{ t.label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Zakres dat -->
+      <div class="col-md-2">
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">Od</label>
+            <input type="date" name="date_from" class="form-control form-control-sm" value="{{ order_filters.date_from }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label form-label-sm mb-1">Do</label>
+            <input type="date" name="date_to" class="form-control form-control-sm" value="{{ order_filters.date_to }}">
+          </div>
+        </div>
+      </div>
+
+      <!-- Checkbox + reset -->
+      <div class="col-12 mt-2 d-flex justify-content-between align-items-center">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="hide_completed" value="1"
+            id="workorderListHideCompletedCheckbox" {% if order_filters.hide_completed %}checked{% endif %}>
+          <label class="form-check-label small" for="workorderListHideCompletedCheckbox">
+            Ukryj zakończone / odwołane
+          </label>
+        </div>
+
+        <button type="button" id="workorder-list-filters-reset" class="btn btn-sm btn-outline-secondary">
+          Resetuj
+        </button>
+      </div>
+    </form>
+  </div>
+
   <div class="card-body p-0">
     <table class="table table-hover mb-0 align-middle">
       <thead class="table-light">
@@ -83,77 +124,66 @@
         <tr>
           <td>
             {% if order.number %}
-            {{ order.number }}
+              {{ order.number }}
             {% else %}
-            #{{ order.id }}
+              #{{ order.id }}
             {% endif %}
           </td>
-          <td>
-            {{ order.created_at|date:"d.m.Y" }}
-          </td>
+          <td>{{ order.created_at|date:"d.m.Y" }}</td>
           <td>{{ order.title }}</td>
           <td>
             {% if order.site %}
-            {{ order.site.name }}<br>
-            <span class="small text-muted">
-              {{ order.site.city }}
-            </span>
+              {{ order.site.name }}<br>
+              <span class="small text-muted">{{ order.site.city }}</span>
             {% else %}
-            &#8212;
+              &#8212;
             {% endif %}
           </td>
-          <td>
-  {% if order.work_type == order.WorkOrderType.SERVICE %}
-    <span class="badge bg-primary">Serwis</span>
-  {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-    <span class="badge bg-info text-dark">Konserwacja</span>
-  {% elif order.work_type == order.WorkOrderType.JOB %}
-    <span class="badge bg-secondary">Montaż</span>
-  {% else %}
-    <span class="badge bg-light text-dark border">Inne</span>
-  {% endif %}
-</td>
 
           <td>
-  {% if order.status == order.Status.NEW %}
-    <span class="badge bg-light text-dark border">Do umówienia</span>
-
-  {% elif order.status == order.Status.SCHEDULED %}
-    <span class="badge bg-secondary">Umówione</span>
-
-  {% elif order.status == order.Status.IN_PROGRESS %}
-    <span class="badge bg-success">Realizacja</span>
-
-  {% elif order.status == order.Status.REALIZED %}
-    <span class="badge bg-danger">Zrealizowane</span>
-
-  {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-    <span class="badge bg-warning text-dark">Decyzja</span>
-
-  {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-    <span class="badge bg-warning text-dark">Materiał</span>
-
-  {% elif order.status == order.Status.COMPLETED %}
-    <span class="badge bg-dark">Zakończone</span>
-
-  {% elif order.status == order.Status.CANCELLED %}
-    <span class="badge bg-dark">Odwołane</span>
-
-  {% else %}
-    <span class="badge bg-light text-dark border">Inny</span>
-  {% endif %}
-</td>
-
-          <td>
-            {{ order.planned_date|date:"d.m.Y" }}
+            {% if order.work_type == order.WorkOrderType.SERVICE %}
+              <span class="badge bg-primary">Serwis</span>
+            {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+              <span class="badge bg-info text-dark">Konserwacja</span>
+            {% elif order.work_type == order.WorkOrderType.JOB %}
+              <span class="badge bg-secondary">Montaż</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">Inne</span>
+            {% endif %}
           </td>
+
+          <td>
+            {% if order.status == order.Status.NEW %}
+              <span class="badge bg-light text-dark border">Do umówienia</span>
+            {% elif order.status == order.Status.SCHEDULED %}
+              <span class="badge bg-secondary">Umówione</span>
+            {% elif order.status == order.Status.IN_PROGRESS %}
+              <span class="badge bg-success">Realizacja</span>
+            {% elif order.status == order.Status.REALIZED %}
+              <span class="badge bg-danger">Zrealizowane</span>
+            {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+              <span class="badge bg-warning text-dark">Decyzja</span>
+            {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+              <span class="badge bg-warning text-dark">Materiał</span>
+            {% elif order.status == order.Status.COMPLETED %}
+              <span class="badge bg-dark">Zakończone</span>
+            {% elif order.status == order.Status.CANCELLED %}
+              <span class="badge bg-dark">Odwołane</span>
+            {% else %}
+              <span class="badge bg-light text-dark border">Inny</span>
+            {% endif %}
+          </td>
+
+          <td>{{ order.planned_date|date:"d.m.Y" }}</td>
+
           <td>
             {% if order.assigned_to %}
-            {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+              {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
             {% else %}
-            <span class="text-muted small">nieprzypisane</span>
+              <span class="text-muted small">nieprzypisane</span>
             {% endif %}
           </td>
+
           <td class="text-end">
             <a href="{% url 'core:workorder_detail' order.pk %}" class="btn btn-sm btn-primary">
               Szczegóły
@@ -176,36 +206,33 @@
   <div class="card-footer bg-white">
     <nav aria-label="Paginacja zleceń">
       <ul class="pagination pagination-sm mb-0 justify-content-end">
+
         {% if page_obj.has_previous %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+          <a class="page-link" href="{% if querystring %}?{{ querystring }}&page={{ page_obj.previous_page_number }}{% else %}?page={{ page_obj.previous_page_number }}{% endif %}">«</a>
         </li>
         {% else %}
-        <li class="page-item disabled">
-          <span class="page-link">«</span>
-        </li>
+        <li class="page-item disabled"><span class="page-link">«</span></li>
         {% endif %}
 
         {% for num in paginator.page_range %}
-        {% if num == page_obj.number %}
-        <li class="page-item active" aria-current="page">
-          <span class="page-link">{{ num }}</span>
-        </li>
-        {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %} <li class="page-item">
-          <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-          </li>
+          {% if num == page_obj.number %}
+            <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+          {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
+            <li class="page-item">
+              <a class="page-link" href="{% if querystring %}?{{ querystring }}&page={{ num }}{% else %}?page={{ num }}{% endif %}">{{ num }}</a>
+            </li>
           {% endif %}
-          {% endfor %}
+        {% endfor %}
 
-          {% if page_obj.has_next %}
-          <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
-          </li>
-          {% else %}
-          <li class="page-item disabled">
-            <span class="page-link">»</span>
-          </li>
-          {% endif %}
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="{% if querystring %}?{{ querystring }}&page={{ page_obj.next_page_number }}{% else %}?page={{ page_obj.next_page_number }}{% endif %}">»</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">»</span></li>
+        {% endif %}
+
       </ul>
     </nav>
   </div>

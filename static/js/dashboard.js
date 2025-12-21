@@ -1,256 +1,184 @@
-document.addEventListener("DOMContentLoaded", function () {
-  const root = document.getElementById("dashboard-root");
-  if (!root) {
-    return;
-  }
+document.addEventListener("DOMContentLoaded", () => {
+  function setupFilterForm({
+    formId,
+    storageKey,
+    appliedOnceKey,
+    keys,
+    defaults,
+    timeSelectId,
+    resetBtnId,
+  }) {
+    const form = document.getElementById(formId);
+    if (!form) return;
 
-  const userId = root.dataset.userId || "anon";
+    const timeSelect = document.getElementById(timeSelectId) || form.querySelector("select[name='time']");
+    const fromInput = form.querySelector("input[name='date_from']");
+    const toInput = form.querySelector("input[name='date_to']");
+    const resetBtn = document.getElementById(resetBtnId);
 
-  // --- Helpery localStorage dla kolejek drag&drop ---
+    function updateDateRangeVisibility() {
+      if (!timeSelect || !fromInput || !toInput) return;
 
-  function saveOrder(container, storageKey, itemSelector) {
-    if (!container) return;
-    const items = Array.from(container.querySelectorAll(itemSelector));
-    const ids = items
-      .map((el) => el.dataset.id)
-      .filter((id) => typeof id !== "undefined" && id !== null && id !== "");
-    try {
-      window.localStorage.setItem(storageKey, JSON.stringify(ids));
-    } catch (e) {
-      // brak localStorage / tryb prywatny – ignorujemy
-    }
-  }
+      const isRange = timeSelect.value === "range";
+      const fromCol = fromInput.closest(".col-6");
+      const toCol = toInput.closest(".col-6");
 
-  function applyOrder(container, storageKey, itemSelector) {
-    if (!container) return;
-    let stored = null;
-    try {
-      stored = window.localStorage.getItem(storageKey);
-    } catch (e) {
-      stored = null;
-    }
-    if (!stored) return;
+      if (fromCol) fromCol.style.display = isRange ? "" : "none";
+      if (toCol) toCol.style.display = isRange ? "" : "none";
 
-    let ids;
-    try {
-      ids = JSON.parse(stored);
-    } catch (e) {
-      return;
-    }
-    if (!Array.isArray(ids)) return;
+      fromInput.disabled = !isRange;
+      toInput.disabled = !isRange;
 
-    const items = Array.from(container.querySelectorAll(itemSelector));
-    const lookup = new Map();
-    items.forEach((el) => {
-      const id = el.dataset.id;
-      if (id) {
-        lookup.set(id, el);
+      if (!isRange) {
+        fromInput.value = "";
+        toInput.value = "";
       }
-    });
-
-    ids.forEach((id) => {
-      const el = lookup.get(id);
-      if (el) {
-        container.appendChild(el);
-      }
-    });
-  }
-
-  // --- ZLECENIA: drag&drop + pamięć ---
-
-  const ordersBody = document.getElementById("dashboard-orders-body");
-  if (ordersBody) {
-    const ordersStorageKey = `allsec_dashboard_orders_${userId}`;
-
-    applyOrder(ordersBody, ordersStorageKey, "tr[data-id]");
-
-    if (window.Sortable && typeof window.Sortable.create === "function") {
-      window.Sortable.create(ordersBody, {
-        animation: 150,
-        onEnd: function () {
-          saveOrder(ordersBody, ordersStorageKey, "tr[data-id]");
-        },
-      });
     }
-  }
 
-  // --- KONSERWACJE: drag&drop + pamięć per miesiąc ---
-
-  const maintenanceCard = document.getElementById("dashboard-maintenance-card");
-  const maintenanceList = document.getElementById("dashboard-maintenance-list");
-
-  if (maintenanceCard && maintenanceList) {
-    const year = maintenanceCard.dataset.year || "0000";
-    const month = maintenanceCard.dataset.month || "00";
-    const maintStorageKey = `allsec_dashboard_maintenance_${userId}_${year}_${month}`;
-
-    applyOrder(maintenanceList, maintStorageKey, "li[data-id]");
-
-    if (window.Sortable && typeof window.Sortable.create === "function") {
-      window.Sortable.create(maintenanceList, {
-        animation: 150,
-        onEnd: function () {
-          saveOrder(maintenanceList, maintStorageKey, "li[data-id]");
-        },
-      });
-    }
-  }
-
-  // --- Pokazywanie pól dat dla time == 'range' ---
-
-  const timeSelect = document.getElementById("dashboard-filter-time");
-  const dateFromInput = document.querySelector("input[name='date_from']");
-  const dateToInput = document.querySelector("input[name='date_to']");
-
-  function updateDateRangeVisibility() {
-    if (!timeSelect || !dateFromInput || !dateToInput) return;
-    const show = timeSelect.value === "range";
-    const fromGroup = dateFromInput.closest(".col-6");
-    const toGroup = dateToInput.closest(".col-6");
-    if (fromGroup) fromGroup.style.display = show ? "" : "none";
-    if (toGroup) toGroup.style.display = show ? "" : "none";
-  }
-
-  updateDateRangeVisibility();
-  if (timeSelect) {
-    timeSelect.addEventListener("change", updateDateRangeVisibility);
-  }
-
-  // --- Filtry zleceń: pamiętanie ustawień + auto-submit + reset ---
-
-  const filtersForm = document.getElementById("dashboard-orders-filters");
-
-  function hasQueryFilters() {
-    const params = new URLSearchParams(window.location.search);
-    const filterNames = [
-      "type",
-      "assignee",
-      "status",
-      "time",
-      "date_from",
-      "date_to",
-      "hide_completed",
-    ];
-    return filterNames.some((name) => params.has(name));
-  }
-
-  if (filtersForm) {
-    const filtersStorageKey = `allsec_dashboard_filters_${userId}`;
-
-    function saveFiltersToStorage() {
+    function saveFilters() {
       const data = {};
-      const typeField = filtersForm.querySelector("select[name='type']");
-      const assigneeField = filtersForm.querySelector("select[name='assignee']");
-      const statusField = filtersForm.querySelector("select[name='status']");
-      const timeField = filtersForm.querySelector("select[name='time']");
-      const dateFromField = filtersForm.querySelector("input[name='date_from']");
-      const dateToField = filtersForm.querySelector("input[name='date_to']");
-      const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+      keys.forEach((k) => {
+        const el = form.querySelector(`[name="${k}"]`);
+        if (!el) return;
 
-      data.type = typeField ? typeField.value || "" : "";
-      data.assignee = assigneeField ? assigneeField.value || "" : "";
-      data.status = statusField ? statusField.value || "" : "";
-      data.time = timeField ? timeField.value || "" : "";
-      data.date_from = dateFromField ? dateFromField.value || "" : "";
-      data.date_to = dateToField ? dateToField.value || "" : "";
-      data.hide_completed = hideCheckbox ? !!hideCheckbox.checked : true;
+        if (el.type === "checkbox") {
+          data[k] = el.checked ? "1" : "";
+        } else {
+          data[k] = el.value;
+        }
+      });
 
-      try {
-        window.localStorage.setItem(filtersStorageKey, JSON.stringify(data));
-      } catch (e) {
-        // brak localStorage – ignorujemy
-      }
+      localStorage.setItem(storageKey, JSON.stringify(data));
     }
 
-    function loadFiltersFromStorage() {
-      let stored = null;
+    // 1) Jeśli URL nie ma filtrów, a w localStorage są => zastosuj raz i przeładuj
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasAnyFilterInUrl = keys.some((k) => {
+      const v = urlParams.get(k);
+      return v !== null && v !== "";
+    });
+
+    if (!hasAnyFilterInUrl && !sessionStorage.getItem(appliedOnceKey)) {
       try {
-        stored = window.localStorage.getItem(filtersStorageKey);
-      } catch (e) {
-        stored = null;
-      }
-      if (!stored) return false;
+        const saved = JSON.parse(localStorage.getItem(storageKey) || "{}");
+        let shouldSubmit = false;
 
-      let data;
-      try {
-        data = JSON.parse(stored);
-      } catch (e) {
-        return false;
-      }
-      if (!data || typeof data !== "object") return false;
+        keys.forEach((k) => {
+          const el = form.querySelector(`[name="${k}"]`);
+          if (!el) return;
 
-      const typeField = filtersForm.querySelector("select[name='type']");
-      const assigneeField = filtersForm.querySelector("select[name='assignee']");
-      const statusField = filtersForm.querySelector("select[name='status']");
-      const timeField = filtersForm.querySelector("select[name='time']");
-      const dateFromField = filtersForm.querySelector("input[name='date_from']");
-      const dateToField = filtersForm.querySelector("input[name='date_to']");
-      const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+          const savedVal = saved[k];
+          if (savedVal === undefined) return;
 
-      if (typeField && "type" in data) typeField.value = data.type || "";
-      if (assigneeField && "assignee" in data)
-        assigneeField.value = data.assignee || "";
-      if (statusField && "status" in data) statusField.value = data.status || "";
-      if (timeField && "time" in data) timeField.value = data.time || "";
-      if (dateFromField && "date_from" in data)
-        dateFromField.value = data.date_from || "";
-      if (dateToField && "date_to" in data)
-        dateToField.value = data.date_to || "";
-      if (hideCheckbox && "hide_completed" in data)
-        hideCheckbox.checked = !!data.hide_completed;
+          if (el.type === "checkbox") {
+            const desired = savedVal === "1";
+            if (el.checked !== desired) {
+              el.checked = desired;
+              shouldSubmit = true;
+            }
+          } else {
+            if (savedVal !== "" && el.value !== savedVal) {
+              el.value = savedVal;
+              shouldSubmit = true;
+            }
+          }
+        });
 
-      return true;
-    }
-
-    // Jeśli nie ma żadnych filtrów w URL, spróbuj wczytać z localStorage
-    if (!hasQueryFilters()) {
-      const loaded = loadFiltersFromStorage();
-      if (loaded) {
         updateDateRangeVisibility();
-        filtersForm.submit();
-        return; // reszta JS wykona się po przeładowaniu strony
+
+        if (shouldSubmit) {
+          sessionStorage.setItem(appliedOnceKey, "1");
+          form.submit();
+          return;
+        }
+      } catch (e) {
+        // ignore
       }
+    } else {
+      // po przeładowaniu usuń flagę
+      sessionStorage.removeItem(appliedOnceKey);
     }
 
-    // Auto-submit + zapisywanie filtrów po każdej zmianie
-    const autoSubmitInputs = filtersForm.querySelectorAll(
-      "select, input[type='checkbox'], input[type='date']"
-    );
+    // 2) Auto-submit na zmianę + zapis do localStorage
+    const autoSubmitInputs = form.querySelectorAll("select, input[type='checkbox']");
     autoSubmitInputs.forEach((el) => {
-      el.addEventListener("change", function () {
-        saveFiltersToStorage();
-        filtersForm.submit();
+      el.addEventListener("change", () => {
+        updateDateRangeVisibility();
+        saveFilters();
+        form.submit();
       });
     });
 
-    // Przycisk "Resetuj" – przywrócenie domyślnych wartości
-    const resetButton = document.getElementById("dashboard-filters-reset");
-    if (resetButton) {
-      resetButton.addEventListener("click", function () {
-        const typeField = filtersForm.querySelector("select[name='type']");
-        const assigneeField = filtersForm.querySelector("select[name='assignee']");
-        const statusField = filtersForm.querySelector("select[name='status']");
-        const timeField = filtersForm.querySelector("select[name='time']");
-        const dateFromField = filtersForm.querySelector("input[name='date_from']");
-        const dateToField = filtersForm.querySelector("input[name='date_to']");
-        const hideCheckbox = filtersForm.querySelector("input[name='hide_completed']");
+    // date inputs: zapis (submit leci przez zmianę time=range lub ręczne przeładowanie)
+    if (fromInput) fromInput.addEventListener("change", saveFilters);
+    if (toInput) toInput.addEventListener("change", saveFilters);
 
-        if (typeField) typeField.value = "";
-        if (assigneeField) assigneeField.value = "";
-        if (statusField) statusField.value = "";
-        if (timeField) timeField.value = "week";
-        if (dateFromField) dateFromField.value = "";
-        if (dateToField) dateToField.value = "";
-        if (hideCheckbox) hideCheckbox.checked = true;
+    // 3) Reset
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        keys.forEach((k) => {
+          const el = form.querySelector(`[name="${k}"]`);
+          if (!el) return;
 
-        try {
-          window.localStorage.removeItem(filtersStorageKey);
-        } catch (e) {}
+          const defVal = defaults[k];
+
+          if (el.type === "checkbox") {
+            el.checked = defVal === "1";
+          } else if (defVal !== undefined) {
+            el.value = defVal;
+          } else {
+            el.value = "";
+          }
+        });
 
         updateDateRangeVisibility();
-
-        filtersForm.submit();
+        saveFilters();
+        form.submit();
       });
     }
+
+    // na start
+    updateDateRangeVisibility();
+
+    // zapis również przy submit (fallback)
+    form.addEventListener("submit", saveFilters);
   }
+
+  // Dashboard
+  setupFilterForm({
+    formId: "dashboard-orders-filters",
+    storageKey: "dashboardOrdersFilters",
+    appliedOnceKey: "dashboardFiltersApplied",
+    keys: ["type", "assignee", "status", "time", "date_from", "date_to", "hide_completed"],
+    defaults: {
+      type: "",
+      assignee: "",
+      status: "",
+      time: "week",
+      date_from: "",
+      date_to: "",
+      hide_completed: "1",
+    },
+    timeSelectId: "dashboard-filter-time",
+    resetBtnId: "dashboard-filters-reset",
+  });
+
+  // Workorder list
+  setupFilterForm({
+    formId: "workorder-list-filters",
+    storageKey: "workorderListFilters",
+    appliedOnceKey: "workorderListFiltersApplied",
+    keys: ["site", "assignee", "status", "time", "date_from", "date_to", "hide_completed"],
+    defaults: {
+      site: "",
+      assignee: "",
+      status: "",
+      time: "all",
+      date_from: "",
+      date_to: "",
+      hide_completed: "1",
+    },
+    timeSelectId: "workorder-list-filter-time",
+    resetBtnId: "workorder-list-filters-reset",
+  });
 });
