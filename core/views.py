@@ -1623,6 +1623,7 @@ def maintenance_protocol_edit(request, pk):
         section_formsets = []
         is_valid = form.is_valid()
 
+        # 1) Zbuduj wszystkie formsety i sprawdź walidację
         for section in sections_qs:
             formset = MaintenanceCheckItemFormSet(
                 request.POST,
@@ -1630,28 +1631,29 @@ def maintenance_protocol_edit(request, pk):
                 prefix=f"section-{section.pk}",
             )
             section_formsets.append({"section": section, "formset": formset})
+
             if not formset.is_valid():
                 is_valid = False
 
-                if is_valid:
-                    form.save()
+        # 2) Jeśli WSZYSTKO valid -> zapis + redirect
+        if is_valid:
+            form.save()
 
-                    # Zapisujemy uwagi (podsumowanie sekcji) dla każdej sekcji
-                    for bundle in section_formsets:
-                        section = bundle["section"]
-                        remarks_field = f"section_{section.pk}_remarks"
-                        new_remarks = (request.POST.get(remarks_field) or "").strip()
+            # Uwagi sekcji + zapis checklisty
+            for bundle in section_formsets:
+                section = bundle["section"]
+                remarks_field = f"section_{section.pk}_remarks"
+                new_remarks = (request.POST.get(remarks_field) or "").strip()
 
-                        if new_remarks != (section.section_remarks or ""):
-                            section.section_remarks = new_remarks
-                            section.save(update_fields=["section_remarks"])
+                if new_remarks != (section.section_remarks or ""):
+                    section.section_remarks = new_remarks
+                    section.save(update_fields=["section_remarks"])
 
-                        # zapisujemy też wyniki / notatki z checklisty
-                        bundle["formset"].save()
+                bundle["formset"].save()
 
-                    return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
+            return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
 
-
+        # jeśli nie valid -> spadamy na render z błędami (200)
     else:
         form = MaintenanceProtocolForm(instance=protocol)
 
@@ -1671,6 +1673,7 @@ def maintenance_protocol_edit(request, pk):
         "section_formsets": section_formsets,
     }
     return render(request, "core/maintenance_protocol_form.html", context)
+
 
 
 
