@@ -19,9 +19,11 @@ urlpatterns = [
     path("api/powiadomienia/zlecenia/unread-count/",views.api_workorder_events_unread_count,name="api_workorder_events_unread_count"),
     path("api/powiadomienia/zlecenia/unread-latest/",views.api_workorder_events_unread_latest,name="api_workorder_events_unread_latest"),
     path("powiadomienia/zlecenia/<int:event_id>/open/", views.workorder_event_open, name="workorder_event_open"),
+    path("zlecenia/<int:pk>/set-completed/",views.workorder_set_completed,name="workorder_set_completed"),
 
 
     path("pwa/zlecenia/<int:pk>/protokol/", views_pwa.pwa_servicereport_entry, name="pwa_servicereport_entry"),
+    path("zlecenia/<int:pk>/protokol-konserwacji/",views.maintenance_protocol_entry,name="maintenance_protocol_entry"),
     path("pwa/protokoly/serwis/<int:pk>/", views_pwa.pwa_servicereport_edit, name="pwa_servicereport_edit"),
 
     path("api/pwa/workorders/dump/", views_pwa.api_pwa_workorders_dump, name="api_pwa_workorders_dump"),

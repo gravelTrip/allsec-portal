@@ -8,7 +8,7 @@
 
 
   <!-- KAFLE KPI -->
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-4" id="dashboard-kpi">
     <div class="col-md-3">
       <div class="card shadow-sm border-0">
         <div class="card-body">
@@ -74,6 +74,11 @@
         <div class="card-header bg-white">
           <div class="d-flex justify-content-between align-items-center mb-2">
             <h5 class="mb-0">Zlecenia</h5>
+
+            <a href="{% url 'core:workorder_create' %}" class="btn btn-sm btn-success">
+              <i class="bi bi-plus-lg me-1"></i>
+              Nowe zlecenie
+            </a>
           </div>
 
           <form method="get" id="dashboard-orders-filters" class="row g-2 align-items-end">
@@ -168,12 +173,14 @@
           <table class="table table-hover mb-0 align-middle">
             <thead class="table-light">
               <tr>
+                <th style="width: 34px;"></th>
                 <th>Zlecenie</th>
                 <th>Obiekt</th>
                 <th>Typ</th>
                 <th>Status</th>
-                <th>Planowana data</th>
-                <th></th>
+                <th>Termin</th>
+                <th>Serwisant</th>
+                <th class="text-end"></th>
               </tr>
             </thead>
             <tbody id="dashboard-orders-body">
@@ -181,76 +188,123 @@
               {% for order in today_orders %}
               <tr data-id="{{ order.id }}">
 
-                <td>
-                  {% if order.number %}
-                  {{ order.number }}
-                  {% else %}
-                  #{{ order.id }}
-                  {% endif %}
-                  {% if order.title %}
-                  – {{ order.title }}
-                  {% endif %}
-                </td>
+                  <td class="text-muted pe-0">
+                    <span class="drag-handle" title="Przeciągnij, aby zmienić kolejność" aria-label="Przeciągnij">
+                      <i class="bi bi-grip-vertical"></i>
+                    </span>
+                  </td>
 
-                <td>
-                  {{ order.site.name }}
-                </td>
-                <td>
-  {% if order.work_type == order.WorkOrderType.SERVICE %}
-    <span class="badge bg-primary">Serwis</span>
-  {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
-    <span class="badge bg-info text-dark">Konserwacja</span>
-  {% elif order.work_type == order.WorkOrderType.JOB %}
-    <span class="badge bg-secondary">Montaż</span>
-  {% else %}
-    <span class="badge bg-light text-dark border">Inne</span>
-  {% endif %}
-</td>
+                  <!-- 1) Zlecenie: ucięcie tytułu + tooltip + link do podglądu (bez wyglądu linka) -->
+                  <td>
+                    <a href="{% url 'core:workorder_detail' pk=order.pk %}"
+                      class="text-body text-decoration-none fw-semibold"
+                      title="{% if order.number %}{{ order.number }}{% else %}#{{ order.id }}{% endif %}{% if order.title %} – {{ order.title }}{% endif %}">
+                      {% if order.number %}
+                        {{ order.number }}
+                      {% else %}
+                        #{{ order.id }}
+                      {% endif %}
+                      {% if order.title %}
+                        – {{ order.title|truncatechars:40 }}
+                      {% endif %}
+                    </a>
+                  </td>
 
-                <td>
-  {% if order.status == order.Status.NEW %}
-    <span class="badge bg-light text-dark border">Do umówienia</span>
+                  <!-- 2) Obiekt: link do szczegółów obiektu, bez zmiany stylu -->
+                  <td>
+                    <a href="{% url 'core:site_detail' pk=order.site.pk %}"
+                      class="text-reset text-decoration-none"
+                      title="{{ order.site.name }}">
+                      {{ order.site.name }}
+                    </a>
+                  </td>
 
-  {% elif order.status == order.Status.SCHEDULED %}
-    <span class="badge bg-secondary">Umówione</span>
+                  <!-- 3) Typ: badge klikalny -> edycja właściwego protokołu (Serwis / Konserwacja) -->
+                  <td>
+                    {% if order.work_type == order.WorkOrderType.SERVICE %}
+                      <a href="{% url 'core:service_report_entry' pk=order.pk %}?mode=edit" class="text-decoration-none">
+                        <span class="badge bg-primary">Serwis</span>
+                      </a>
+                    {% elif order.work_type == order.WorkOrderType.MAINTENANCE %}
+                      <a href="{% url 'core:maintenance_protocol_entry' pk=order.pk %}?mode=edit" class="text-decoration-none">
+                        <span class="badge bg-info text-dark">Konserwacja</span>
+                      </a>
+                    {% elif order.work_type == order.WorkOrderType.JOB %}
+                      <span class="badge bg-secondary">Montaż</span>
+                    {% else %}
+                      <span class="badge bg-light text-dark border">Inne</span>
+                    {% endif %}
+                  </td>
 
-  {% elif order.status == order.Status.IN_PROGRESS %}
-    <span class="badge bg-success">Realizacja</span>
+                  <!-- 4) Status: bez zmian -->
+                  <td>
+                    {% if order.status == order.Status.NEW %}
+                      <span class="badge bg-light text-dark border">Do umówienia</span>
+                    {% elif order.status == order.Status.SCHEDULED %}
+                      <span class="badge bg-secondary">Umówione</span>
+                    {% elif order.status == order.Status.IN_PROGRESS %}
+                      <span class="badge bg-success">Realizacja</span>
+                    {% elif order.status == order.Status.REALIZED %}
+                      <span class="badge bg-danger">Zrealizowane</span>
+                    {% elif order.status == order.Status.WAITING_FOR_DECISION %}
+                      <span class="badge bg-warning text-dark">Decyzja</span>
+                    {% elif order.status == order.Status.WAITING_FOR_PARTS %}
+                      <span class="badge bg-warning text-dark">Materiał</span>
+                    {% elif order.status == order.Status.COMPLETED %}
+                      <span class="badge bg-dark">Zakończone</span>
+                    {% elif order.status == order.Status.CANCELLED %}
+                      <span class="badge bg-dark">Odwołane</span>
+                    {% else %}
+                      <span class="badge bg-light text-dark border">Inny</span>
+                    {% endif %}
+                  </td>
 
-  {% elif order.status == order.Status.REALIZED %}
-    <span class="badge bg-danger">Zrealizowane</span>
+                  <!-- 5) Termin: to samo pole co było -->
+                  <td>
+                    {{ order.planned_date|date:"d.m.Y" }}
+                  </td>
 
-  {% elif order.status == order.Status.WAITING_FOR_DECISION %}
-    <span class="badge bg-warning text-dark">Decyzja</span>
+                  <!-- 6) Serwisant: nowa kolumna -->
+                  <td>
+                    {% if order.assigned_to %}
+                      {{ order.assigned_to.get_full_name|default:order.assigned_to.username }}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
 
-  {% elif order.status == order.Status.WAITING_FOR_PARTS %}
-    <span class="badge bg-warning text-dark">Materiał</span>
+                  <!-- 7) Akcje: dwa kwadratowe przyciski z ikonami -->
+                  <td class="text-end">
+                    <div class="d-inline-flex align-items-center gap-1">
 
-  {% elif order.status == order.Status.COMPLETED %}
-    <span class="badge bg-dark">Zakończone</span>
+                      {% if can_edit_orders %}
+                        <a href="{% url 'core:workorder_edit' pk=order.pk %}"
+                          class="btn btn-sm btn-primary btn-icon-square"
+                          title="Edytuj zlecenie">
+                          <i class="bi bi-pencil"></i>
+                        </a>
+                      {% endif %}
 
-  {% elif order.status == order.Status.CANCELLED %}
-    <span class="badge bg-dark">Odwołane</span>
+                      <form method="post" action="{% url 'core:workorder_set_completed' pk=order.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="back" value="{{ request.get_full_path }}">
+                        <button type="submit"
+                                class="btn btn-sm btn-dark btn-icon-square"
+                                title="Oznacz jako zakończone"
+                                {% if order.status == order.Status.COMPLETED %}disabled{% endif %}>
+                          <i class="bi bi-check2"></i>
+                        </button>
+                      </form>
 
-  {% else %}
-    <span class="badge bg-light text-dark border">Inny</span>
-  {% endif %}
-</td>
+                    </div>
+                  </td>
 
+                </tr>
 
-                <td>
-                  {{ order.planned_date|date:"d.m.Y" }}
-                </td>
-                <td class="text-end">
-                  <a href="{% url 'core:workorder_detail' pk=order.pk %}" class="btn btn-sm btn-primary">
-                    Otwórz
-                  </a>
-                </td>
-              </tr>
               {% endfor %}
               {% else %}
               <tr>
-                <td colspan="7" class="text-muted small text-center py-3">
+                <td colspan="8" class="text-muted small text-center py-3">
                   Brak zleceń dla wybranych filtrów.
                 </td>
               </tr>
@@ -294,21 +348,26 @@
         <ul class="list-group list-group-flush" id="dashboard-maintenance-list">
           {% if maintenance_module.items %}
           {% for item in maintenance_module.items %}
-          <li class="list-group-item d-flex justify-content-between align-items-center small"
-            data-id="{{ item.site.id }}">
-            <span>{{ item.site.name }}</span>
+          <li class="list-group-item d-flex justify-content-between align-items-center small" data-id="{{ item.site.id }}">
+            <div class="d-flex align-items-center flex-grow-1 me-2">
+              <span class="drag-handle me-2 text-muted" title="Przeciągnij, aby zmienić kolejność" aria-label="Przeciągnij">
+                <i class="bi bi-grip-vertical"></i>
+              </span>
+              <span>{{ item.site.name }}</span>
+            </div>
 
             {% if item.ongoing_order %}
-            <a href="{% url 'core:workorder_detail' pk=item.ongoing_order.pk %}" class="btn btn-sm btn-success">
-              W trakcie
-            </a>
+              <a href="{% url 'core:workorder_detail' pk=item.ongoing_order.pk %}" class="btn btn-sm btn-success">
+                W trakcie
+              </a>
             {% else %}
-            <a href="{% url 'core:workorder_create' %}?site={{ item.site.id }}&work_type=MAINTENANCE&period={{ maintenance_module.selected_period_param }}"
-              class="btn btn-sm btn-outline-primary">
-              Utwórz
-            </a>
+              <a href="{% url 'core:workorder_create' %}?site={{ item.site.id }}&work_type=MAINTENANCE&period={{ maintenance_module.selected_period_param }}"
+                class="btn btn-sm btn-outline-primary">
+                Utwórz
+              </a>
             {% endif %}
           </li>
+
           {% endfor %}
           {% else %}
           <li class="list-group-item small text-muted">

@@ -167,7 +167,7 @@ main h1.h3 {
 }
 
 /* przyciski w tabelach – minimalnie mniejsze */
-.table .btn-sm {
+.table .btn-sm:not(.btn-icon-square) {
     padding: 0.15rem 0.55rem;
     font-size: 0.75rem;
 }
@@ -214,13 +214,26 @@ main h1.h3 {
     text-decoration: none;
 }
 
-#dashboard-orders-body tr {
-    cursor: move;
+/* ====== Dashboard: drag handle ====== */
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: grab;
+  user-select: none;
 }
 
-#dashboard-maintenance-list li {
-    cursor: move;
+.drag-handle:active {
+  cursor: grabbing;
 }
+
+.drag-handle i {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
 
 .pwa-form input,
 .pwa-form select,
@@ -258,4 +271,28 @@ main h1.h3 {
     min-width: 0;
   }
 
+}
+
+/* ====== Dashboard: kwadratowe przyciski akcji ====== */
+.btn-icon-square {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+
+  padding: 0 !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  line-height: 1;
+  box-sizing: border-box;
+  flex: 0 0 32px;
+}
+
+.btn-icon-square i {
+  line-height: 1;
+  font-size: 0.95rem;
+  display: block;
+  pointer-events: none;
 }

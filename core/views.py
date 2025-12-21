@@ -364,6 +364,7 @@ def dashboard(request):
             "assignee_choices": assignee_choices,
             "time_choices": time_choices,
         },
+        "can_edit_orders": is_office(user),
     }
     return render(request, "core/dashboard.html", context)
 
@@ -1430,8 +1431,59 @@ def service_report_entry(request, pk):
             technicians=tech_name,
         )
 
-    # teraz zamiast admina -> nasz front
+    mode = (request.GET.get("mode") or "").strip().lower()
+    if mode == "edit":
+        return redirect("core:service_report_edit", pk=report.pk)
     return redirect("core:service_report_detail", pk=report.pk)
+
+@login_required
+def maintenance_protocol_entry(request, pk):
+    """
+    Wejście do protokołu konserwacji z poziomu zlecenia:
+    - jeśli protokół istnieje -> przejdź do edycji/szczegółów,
+    - jeśli nie -> utwórz (jak przy tworzeniu zlecenia MAINTENANCE) i przejdź dalej.
+    """
+    order = get_object_or_404(WorkOrder.objects.select_related("site"), pk=pk)
+
+    if not (is_office(request.user) or is_technician(request.user)):
+        return HttpResponseForbidden("Brak uprawnień do pracy z protokołem.")
+
+    if order.work_type != WorkOrder.WorkOrderType.MAINTENANCE:
+        return HttpResponseForbidden("Protokół konserwacji dostępny tylko dla zleceń konserwacji.")
+
+    protocol = MaintenanceProtocol.objects.filter(work_order=order).first()
+
+    if protocol is None:
+        period_date = order.planned_date or timezone.localdate()
+        period_year = period_date.year
+        period_month = period_date.month
+
+        next_year = None
+        next_month = None
+        if order.site:
+            next_year, next_month = order.site.get_next_maintenance_period(
+                from_year=period_year,
+                from_month=period_month,
+            )
+
+        protocol = MaintenanceProtocol.objects.create(
+            work_order=order,
+            site=order.site,
+            date=period_date,
+            period_year=period_year,
+            period_month=period_month,
+            next_period_year=next_year,
+            next_period_month=next_month,
+        )
+
+        protocol.assign_number_if_needed()
+        protocol.initialize_sections_from_previous_or_default()
+
+    mode = (request.GET.get("mode") or "").strip().lower()
+    if mode == "edit":
+        return redirect("core:maintenance_protocol_edit", pk=protocol.pk)
+    return redirect("core:maintenance_protocol_detail", pk=protocol.pk)
+
 
 def service_report_detail(request, pk):
     report = get_object_or_404(
@@ -1774,6 +1826,28 @@ def workorder_toggle_realized(request, pk):
 
     # Normalny portal – wróć tam skąd przyszło
     back = request.POST.get("back") or request.META.get("HTTP_REFERER") or reverse("core:workorder_detail", args=[wo.pk])
+    return redirect(back)
+
+@require_POST
+@login_required
+def workorder_set_completed(request, pk):
+    wo = get_object_or_404(WorkOrder, pk=pk)
+
+    # Dostęp: biuro zawsze, serwisant tylko swoje
+    if not is_office(request.user):
+        if wo.assigned_to_id != request.user.id:
+            return JsonResponse({"ok": False, "error": "Brak dostępu."}, status=403)
+
+    if wo.status != WorkOrder.Status.COMPLETED:
+        wo.status = WorkOrder.Status.COMPLETED
+        wo.save(update_fields=["status"])
+        messages.success(request, "Status zmieniony na: Zakończone")
+
+    # JSON dla fetch/XHR
+    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
+        return JsonResponse({"ok": True, "status": wo.status, "status_label": "Zakończone"})
+
+    back = request.POST.get("back") or request.META.get("HTTP_REFERER") or reverse("core:dashboard")
     return redirect(back)
 
 
