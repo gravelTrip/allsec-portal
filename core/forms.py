@@ -383,6 +383,15 @@ MaintenanceCheckItemFormSet = forms.modelformset_factory(
 )
 
 class SiteForm(forms.ModelForm):
+    """
+    Etap C (Site):
+    - wymagane: entity, manager, name, site_type, street, postal_code, city
+    - opcjonalne: google_maps_url, access_info, technical_notes
+    - konserwacje: BEZ dokładania walidacji (zostawiamy jak w modelu)
+    """
+
+    REQUIRED_FIELDS = ("entity", "manager", "name", "site_type", "street", "postal_code", "city")
+
     class Meta:
         model = Site
         fields = [
@@ -404,27 +413,48 @@ class SiteForm(forms.ModelForm):
         widgets = {
             "entity": forms.Select(attrs={"class": "form-select form-select-sm"}),
             "manager": forms.Select(attrs={"class": "form-select form-select-sm"}),
+
             "name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "site_type": forms.Select(attrs={"class": "form-select form-select-sm"}),
+
             "street": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
-            "postal_code": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
+            "postal_code": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "city": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
-            "google_maps_url": forms.URLInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "access_info": forms.Textarea(
-                attrs={"class": "form-control form-control-sm", "rows": 3}
-            ),
-            "technical_notes": forms.Textarea(
-                attrs={"class": "form-control form-control-sm", "rows": 3}
-            ),
+
+            "google_maps_url": forms.URLInput(attrs={"class": "form-control form-control-sm"}),
+            "access_info": forms.Textarea(attrs={"class": "form-control form-control-sm", "rows": 3}),
+            "technical_notes": forms.Textarea(attrs={"class": "form-control form-control-sm", "rows": 3}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        # 1) REQUIRED server-side + required w HTML
+        for fname in self.REQUIRED_FIELDS:
+            f = self.fields.get(fname)
+            if not f:
+                continue
+            f.required = True
+            f.widget.attrs["required"] = "required"
+            f.error_messages = {**f.error_messages, "required": "To pole jest wymagane."}
+
+        # 2) Opcjonalne (dla pewności)
+        for fname in ("google_maps_url", "access_info", "technical_notes"):
+            f = self.fields.get(fname)
+            if f:
+                f.required = False
+                f.widget.attrs.pop("required", None)
+
+        # 3) Bez "---------": TomSelect pokaże placeholder
+        ent = self.fields.get("entity")
+        if ent is not None:
+            ent.empty_label = ""
+
+        mgr = self.fields.get("manager")
+        if mgr is not None:
+            mgr.empty_label = ""
+
+        # 4) Opisy konserwacji (zostawiamy jak miałeś)
         if "maintenance_frequency" in self.fields:
             self.fields["maintenance_frequency"].label = "Częstotliwość konserwacji"
             self.fields["maintenance_frequency"].help_text = (
@@ -438,20 +468,38 @@ class SiteForm(forms.ModelForm):
                 "Dla opcji: co miesiąc / co kwartał / 2x w roku. Np. 1 = styczeń."
             )
 
-        if "maintenance_execution_month_in_period": forms.NumberInput(
-                attrs={
-                    "class": "form-control form-control-sm",
-                    "min": 1,
-                    "max": 12,
-                }
-        )
-
         if "maintenance_custom_months" in self.fields:
             self.fields["maintenance_custom_months"].label = "Miesiące konserwacji (lista)"
             self.fields["maintenance_custom_months"].help_text = (
                 "Tylko dla trybu 'według wybranych miesięcy'. "
                 "Podaj numery miesięcy oddzielone przecinkami, np. 1,4,7,10."
             )
+
+    # --- TRIM + walidacja pustych spacji (dla pól tekstowych wymaganych) ---
+    def clean_name(self):
+        v = (self.cleaned_data.get("name") or "").strip()
+        if not v:
+            raise forms.ValidationError("To pole jest wymagane.")
+        return v
+
+    def clean_street(self):
+        v = (self.cleaned_data.get("street") or "").strip()
+        if not v:
+            raise forms.ValidationError("To pole jest wymagane.")
+        return v
+
+    def clean_postal_code(self):
+        v = (self.cleaned_data.get("postal_code") or "").strip()
+        if not v:
+            raise forms.ValidationError("To pole jest wymagane.")
+        return v
+
+    def clean_city(self):
+        v = (self.cleaned_data.get("city") or "").strip()
+        if not v:
+            raise forms.ValidationError("To pole jest wymagane.")
+        return v
+
 
 class EntityForm(forms.ModelForm):
     """

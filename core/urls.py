@@ -29,6 +29,14 @@ urlpatterns = [
     path("api/pwa/workorders/dump/", views_pwa.api_pwa_workorders_dump, name="api_pwa_workorders_dump"),
     path("api/pwa/servicereport/save/", views_pwa.api_pwa_servicereport_save, name="api_pwa_servicereport_save"),
     path("api/pwa/workorders/<int:pk>/set-status/", views_pwa.api_pwa_workorder_set_status, name="api_pwa_workorder_set_status"),
+    path("api/pwa/ping/", views_pwa.api_pwa_ping, name="api_pwa_ping"),
+    path("api/manager/quick-create/", views.manager_quick_create, name="manager_quick_create"),
+    
+    # Szybkie dodanie "Dane FV" z modala (AJAX)
+    path("api/entity/quick-create/", views.entity_quick_create, name="entity_quick_create"),
+
+
+
 
     path("pwa/zlecenia/<int:pk>/protokol-konserwacji/", views_pwa.pwa_maintenanceprotocol_entry, name="pwa_maintenanceprotocol_entry"),
     path("pwa/protokoly/konserwacja/<int:pk>/", views_pwa.pwa_maintenanceprotocol_edit, name="pwa_maintenanceprotocol_edit"),
@@ -36,7 +44,7 @@ urlpatterns = [
     path("api/pwa/maintenanceprotocol/save/", views_pwa.api_pwa_maintenanceprotocol_save, name="api_pwa_maintenanceprotocol_save"),
 
     path("pwa/sw.js", views_pwa.pwa_sw, name="pwa_sw"),
-    path("api/pwa/ping/", views_pwa.api_pwa_ping, name="api_pwa_ping"),
+    
 
     path("zlecenia/", views.workorder_list, name="workorder_list"),
     path("zlecenia/nowe/", views.workorder_create, name="workorder_create"),
@@ -68,7 +76,6 @@ urlpatterns = [
     path("obiekty/nowy/", views.site_create, name="site_create"),
     path("obiekty/<int:pk>/", views.site_detail, name="site_detail"),
     path("obiekty/<int:pk>/edytuj/", views.site_edit, name="site_edit"),
-    path("obiekty/<int:pk>/usun/", views.site_delete, name="site_delete"),
 
     # Kontakty
     path("kontakty/", views.contact_list, name="contact_list"),

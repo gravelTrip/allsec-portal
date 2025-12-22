@@ -12,62 +12,154 @@
     </div>
 
     {% if can_create %}
-      <a href="{% url 'core:site_create' %}" class="btn btn-primary btn-sm">
+      <a href="{% url 'core:site_create' %}" class="btn btn-success btn-sm">
         + Nowy obiekt
       </a>
     {% endif %}
   </div>
 
   <div class="card shadow-sm border-0">
+
+    <div class="card-header bg-white">
+      <form method="get" id="site-filters-form" class="row g-2 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label form-label-sm mb-1">Nazwa</label>
+          <input type="search"
+                 name="name"
+                 value="{{ filters.name }}"
+                 class="form-control form-control-sm site-filter-text"
+                 placeholder="Szukaj po nazwie…">
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label form-label-sm mb-1">Adres</label>
+          <input type="search"
+                 name="address"
+                 value="{{ filters.address }}"
+                 class="form-control form-control-sm site-filter-text"
+                 placeholder="Ulica / kod…">
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label form-label-sm mb-1">Miasto</label>
+          <select name="city" id="site-filter-city" class="form-select form-select-sm">
+            <option value="">Wszystkie</option>
+            {% for c in city_choices %}
+              <option value="{{ c }}" {% if c == filters.city %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label form-label-sm mb-1">Zarządca</label>
+          <select name="manager" id="site-filter-manager" class="form-select form-select-sm">
+            <option value="">Wszyscy</option>
+            {% for m in manager_choices %}
+              <option value="{{ m.id }}" {% if m.id|stringformat:"s" == filters.manager %}selected{% endif %}>
+                {{ m.short_name|default:m.full_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-12 d-flex justify-content-end mt-1">
+          <a href="{% url 'core:site_list' %}" class="btn btn-sm btn-outline-secondary">
+            Resetuj
+          </a>
+        </div>
+      </form>
+    </div>
+
     <div class="card-body p-0">
-      <table class="table table-hover mb-0 align-middle">
+      <table class="table table-sm mb-0 align-middle">
         <thead class="table-light">
-          <tr>
+          <tr class="small text-muted">
             <th>Nazwa</th>
-            <th>Adres</th>
-            <th>Dane fakturowe</th>
             <th>Zarządca</th>
+            <th>Dane FV</th>
+            <th>Adres</th>
+            <th>Miasto</th>
             <th></th>
+            <th class="text-end"></th>
           </tr>
         </thead>
         <tbody>
           {% if sites %}
             {% for site in sites %}
               <tr>
-                <td>{{ site.name }}</td>
                 <td>
-                  {% if site.street %}
-                    {{ site.street }}<br>
-                  {% endif %}
-                  <span class="text-muted small">
-                    {{ site.postal_code }} {{ site.city }}
-                  </span>
+                  <a href="{% url 'core:site_detail' site.pk %}"
+                     class="text-reset text-decoration-none fw-semibold"
+                     title="{{ site.name }}">
+                    {{ site.name }}
+                  </a>
                 </td>
-                <td>
-                  {% if site.entity %}
-                    {{ site.entity.short_name|default:site.entity.name }}
-                  {% else %}
-                    <span class="text-muted small">brak</span>
-                  {% endif %}
-                </td>
+
                 <td>
                   {% if site.manager %}
-                    {{ site.manager.short_name|default:site.manager.full_name }}
+                    <a href="{% url 'core:manager_detail' site.manager.pk %}"
+                       class="text-reset text-decoration-none">
+                      {{ site.manager.short_name|default:site.manager.full_name }}
+                    </a>
                   {% else %}
                     <span class="text-muted small">brak</span>
                   {% endif %}
                 </td>
+
+                <td>
+                  {% if site.entity %}
+                    <a href="{% url 'core:entity_detail' site.entity.pk %}"
+                       class="text-reset text-decoration-none">
+                      {{ site.entity.short_name|default:site.entity.name }}
+                    </a>
+                  {% else %}
+                    <span class="text-muted small">brak</span>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% with s=site.street|default_if_none:"" pc=site.postal_code|default_if_none:"" ct=site.city|default_if_none:"" %}
+                    {% with query=s|add:" "|add:pc|add:" "|add:ct %}
+                      {% if site.google_maps_url %}
+                        <a href="{{ site.google_maps_url }}" target="_blank" rel="noopener"
+                           class="text-reset text-decoration-none">
+                          {{ site.street|default:"—" }}
+                        </a>
+                      {% else %}
+                        <a href="https://www.google.com/maps/search/?api=1&query={{ query|urlencode }}"
+                           target="_blank" rel="noopener"
+                           class="text-reset text-decoration-none">
+                          {{ site.street|default:"—" }}
+                        </a>
+                      {% endif %}
+                    {% endwith %}
+                  {% endwith %}
+                </td>
+
+                <td>{{ site.city|default:"" }}</td>
+
+                <td>
+                  {% if site.maintenance_frequency and site.maintenance_frequency != "NONE" %}
+                    <span class="badge bg-success">umowa</span>
+                  {% else %}
+                    <span class="badge bg-secondary">brak</span>
+                  {% endif %}
+                </td>
+
                 <td class="text-end">
-                  <a href="{% url 'core:site_detail' site.pk %}"
-                     class="btn btn-sm btn-primary">
-                    Szczegóły
-                  </a>
+                  {% if can_edit %}
+                    <a href="{% url 'core:site_edit' site.pk %}"
+                       class="btn btn-sm btn-primary btn-icon-square"
+                       title="Edytuj">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                  {% endif %}
                 </td>
               </tr>
             {% endfor %}
           {% else %}
             <tr>
-              <td colspan="5" class="text-center text-muted small py-4">
+              <td colspan="7" class="text-center text-muted small py-4">
                 Brak obiektów w bazie.
               </td>
             </tr>
@@ -80,40 +172,85 @@
       <div class="card-footer bg-white border-0">
         <nav aria-label="Paginacja obiektów">
           <ul class="pagination pagination-sm mb-0 justify-content-end">
+
             {% if page_obj.has_previous %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
+                <a class="page-link"
+                   href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ page_obj.previous_page_number }}">«</a>
               </li>
             {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">«</span>
-              </li>
+              <li class="page-item disabled"><span class="page-link">«</span></li>
             {% endif %}
 
-            {% for num in paginator.page_range %}
-              {% if num == page_obj.number %}
-                <li class="page-item active" aria-current="page">
-                  <span class="page-link">{{ num }}</span>
-                </li>
-              {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <li class="page-item">
-                  <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                </li>
-              {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+              <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link"
+                   href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ num }}">{{ num }}</a>
+              </li>
             {% endfor %}
 
             {% if page_obj.has_next %}
               <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
+                <a class="page-link"
+                   href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ page_obj.next_page_number }}">»</a>
               </li>
             {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">»</span>
-              </li>
+              <li class="page-item disabled"><span class="page-link">»</span></li>
             {% endif %}
           </ul>
         </nav>
       </div>
     {% endif %}
   </div>
+
+  <script>
+  (function () {
+    const form = document.getElementById("site-filters-form");
+    if (!form) return;
+
+    const submitNow = () => { if (form.requestSubmit) form.requestSubmit(); else form.submit(); };
+
+    // select -> od razu
+    form.querySelectorAll("select").forEach(sel => {
+      // manager ma TomSelect, ale change na select i tak będzie OK (tylko po wyborze)
+      sel.addEventListener("change", submitNow);
+    });
+
+    // input -> debounce
+    let t = null;
+    form.querySelectorAll(".site-filter-text").forEach(inp => {
+      inp.addEventListener("input", (e) => {
+        if (e.isComposing) return;
+        clearTimeout(t);
+        if (inp.value.length && inp.value.length < 2) return;
+        t = setTimeout(submitNow, 800);
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          clearTimeout(t);
+          submitNow();
+        }
+      });
+    });
+
+    // TomSelect tylko dla Zarządcy (Miasto zostaje zwykłą listą)
+    function initManagerTomSelect() {
+      const sel = document.getElementById("site-filter-manager");
+      if (!sel) return;
+
+      if (!window.TomSelect) { setTimeout(initManagerTomSelect, 50); return; }
+      if (sel.tomselect) return;
+
+      new TomSelect(sel, {
+        allowEmptyOption: true,
+        placeholder: "",
+        plugins: ["clear_button", "dropdown_input"],
+        create: false,
+        openOnFocus: true
+      });
+    }
+    document.addEventListener("DOMContentLoaded", initManagerTomSelect);
+  })();
+  </script>
 {% endblock %}

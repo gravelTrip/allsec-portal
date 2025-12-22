@@ -30,19 +30,50 @@
         <div class="col-md-6">
           <div class="mb-2">
             <label class="form-label small">{{ form.entity.label }}</label>
-            {{ form.entity }}
-            {% if form.entity.errors %}
-            <div class="text-danger small">{{ form.entity.errors|striptags }}</div>
-            {% endif %}
+
+            <div class="d-flex gap-2 align-items-start">
+              <div class="flex-grow-1">
+                {{ form.entity }}
+                {% if form.entity.errors %}
+                  <div class="text-danger small">{{ form.entity.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              {% if can_create_entity %}
+                <button type="button"
+                        class="btn btn-success btn-sm btn-icon-square"
+                        title="Dodaj dane FV"
+                        data-bs-toggle="modal"
+                        data-bs-target="#entityQuickModal">
+                  <i class="bi bi-plus"></i>
+                </button>
+              {% endif %}
+            </div>
           </div>
 
           <div class="mb-2">
-            <label class="form-label small">{{ form.manager.label }}</label>
-            {{ form.manager }}
-            {% if form.manager.errors %}
-            <div class="text-danger small">{{ form.manager.errors|striptags }}</div>
-            {% endif %}
-          </div>
+  <label class="form-label small">{{ form.manager.label }}</label>
+
+  <div class="d-flex gap-2 align-items-start">
+    <div class="flex-grow-1">
+      {{ form.manager }}
+      {% if form.manager.errors %}
+        <div class="text-danger small">{{ form.manager.errors|striptags }}</div>
+      {% endif %}
+    </div>
+
+    {% if can_create_manager %}
+      <button type="button"
+              class="btn btn-success btn-sm btn-icon-square"
+              title="Dodaj zarządcę"
+              data-bs-toggle="modal"
+              data-bs-target="#managerQuickModal">
+        <i class="bi bi-plus"></i>
+      </button>
+    {% endif %}
+  </div>
+</div>
+
 
           <div class="mb-2">
             <label class="form-label small">{{ form.name.label }}</label>
@@ -177,4 +208,356 @@
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  function initTomSelect() {
+    if (!window.TomSelect) { setTimeout(initTomSelect, 50); return; }
+
+    const entitySel = document.getElementById("id_entity");
+    if (entitySel && !entitySel.tomselect) {
+      new TomSelect(entitySel, {
+        allowEmptyOption: true,
+        placeholder: "Wybierz dane FV…",
+        create: false,
+        openOnFocus: true
+      });
+    }
+
+    const managerSel = document.getElementById("id_manager");
+    if (managerSel && !managerSel.tomselect) {
+      new TomSelect(managerSel, {
+        allowEmptyOption: true,
+        placeholder: "Wybierz zarządcę…",
+        create: false,
+        openOnFocus: true
+      });
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", initTomSelect);
+})();
+</script>
+<!-- Modal: szybkie dodanie Dane FV -->
+<div class="modal fade" id="entityQuickModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Dodaj dane FV</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="entityQuickErrorBox" class="alert alert-danger py-2 small d-none"></div>
+
+        <form id="entityQuickForm" novalidate>
+          {% csrf_token %}
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.name.label }}</label>
+                {{ entity_quick_form.name }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.type.label }}</label>
+                {{ entity_quick_form.type }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.nip.label }}</label>
+                {{ entity_quick_form.nip }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.regon.label }}</label>
+                {{ entity_quick_form.regon }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.pesel.label }}</label>
+                {{ entity_quick_form.pesel }}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.street.label }}</label>
+                {{ entity_quick_form.street }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.postal_code.label }}</label>
+                {{ entity_quick_form.postal_code }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.city.label }}</label>
+                {{ entity_quick_form.city }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ entity_quick_form.notes.label }}</label>
+                {{ entity_quick_form.notes }}
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          Anuluj
+        </button>
+        <button type="button" class="btn btn-sm btn-success" id="entityQuickSaveBtn">
+          Zapisz
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const modalEl = document.getElementById("entityQuickModal");
+  const formEl  = document.getElementById("entityQuickForm");
+  const saveBtn = document.getElementById("entityQuickSaveBtn");
+  const errBox  = document.getElementById("entityQuickErrorBox");
+  const entitySel = document.getElementById("id_entity");
+
+  if (!modalEl || !formEl || !saveBtn || !entitySel) return;
+
+  function showError(html) {
+    if (!errBox) return;
+    errBox.innerHTML = html;
+    errBox.classList.remove("d-none");
+  }
+  function clearError() {
+    if (!errBox) return;
+    errBox.innerHTML = "";
+    errBox.classList.add("d-none");
+  }
+
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    clearError();
+    formEl.reset();
+  });
+
+  async function saveEntityQuick() {
+    clearError();
+    saveBtn.disabled = true;
+
+    try {
+      const resp = await fetch("{% url 'core:entity_quick_create' %}", {
+        method: "POST",
+        body: new FormData(formEl),
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || !data.ok) {
+        const errors = data.errors || {};
+        const lines = [];
+
+        for (const [field, arr] of Object.entries(errors)) {
+          (arr || []).forEach(e => {
+            const msg = e && e.message ? e.message : "Błąd walidacji";
+            lines.push(`<div><strong>${field}</strong>: ${msg}</div>`);
+          });
+        }
+
+        showError(lines.length ? lines.join("") : "Nie udało się zapisać. Sprawdź pola.");
+        return;
+      }
+
+      const id = String(data.id);
+      const label = String(data.label || id);
+
+      // jeśli jest TomSelect na polu entity, to aktualizujemy go “po bożemu”
+      if (entitySel.tomselect) {
+        const ts = entitySel.tomselect;
+        ts.addOption({ value: id, text: label });
+        ts.refreshOptions(false);
+        ts.setValue(id, true);
+      } else {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = label;
+        entitySel.appendChild(opt);
+        entitySel.value = id;
+        entitySel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      // zamknij modal
+      const bsModal = bootstrap.Modal.getInstance(modalEl);
+      if (bsModal) bsModal.hide();
+    } catch (e) {
+      showError("Błąd połączenia / zapisu. Spróbuj ponownie.");
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
+  saveBtn.addEventListener("click", saveEntityQuick);
+})();
+</script>
+
+<!-- Modal: szybkie dodanie Zarządcy -->
+<div class="modal fade" id="managerQuickModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title">Dodaj zarządcę</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+      </div>
+
+      <div class="modal-body">
+        <div id="managerQuickErrorBox" class="alert alert-danger py-2 small d-none"></div>
+
+        <form id="managerQuickForm" novalidate>
+          {% csrf_token %}
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.short_name.label }}</label>
+                {{ manager_quick_form.short_name }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.full_name.label }}</label>
+                {{ manager_quick_form.full_name }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.nip.label }}</label>
+                {{ manager_quick_form.nip }}
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.street.label }}</label>
+                {{ manager_quick_form.street }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.postal_code.label }}</label>
+                {{ manager_quick_form.postal_code }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.city.label }}</label>
+                {{ manager_quick_form.city }}
+              </div>
+
+              <div class="mb-2">
+                <label class="form-label small">{{ manager_quick_form.notes.label }}</label>
+                {{ manager_quick_form.notes }}
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">
+          Anuluj
+        </button>
+        <button type="button" class="btn btn-sm btn-success" id="managerQuickSaveBtn">
+          Zapisz
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const modalEl = document.getElementById("managerQuickModal");
+  const formEl  = document.getElementById("managerQuickForm");
+  const saveBtn = document.getElementById("managerQuickSaveBtn");
+  const errBox  = document.getElementById("managerQuickErrorBox");
+  const managerSel = document.getElementById("id_manager");
+
+  if (!modalEl || !formEl || !saveBtn || !managerSel) return;
+
+  function showError(html) {
+    if (!errBox) return;
+    errBox.innerHTML = html;
+    errBox.classList.remove("d-none");
+  }
+  function clearError() {
+    if (!errBox) return;
+    errBox.innerHTML = "";
+    errBox.classList.add("d-none");
+  }
+
+  modalEl.addEventListener("hidden.bs.modal", () => {
+    clearError();
+    formEl.reset();
+  });
+
+  async function saveManagerQuick() {
+    clearError();
+    saveBtn.disabled = true;
+
+    try {
+      const resp = await fetch("{% url 'core:manager_quick_create' %}", {
+        method: "POST",
+        body: new FormData(formEl),
+        credentials: "same-origin",
+        headers: { "Accept": "application/json" }
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok || !data.ok) {
+        const errors = data.errors || {};
+        const lines = [];
+
+        for (const [field, arr] of Object.entries(errors)) {
+          (arr || []).forEach(e => {
+            const msg = e && e.message ? e.message : "Błąd walidacji";
+            lines.push(`<div><strong>${field}</strong>: ${msg}</div>`);
+          });
+        }
+
+        showError(lines.length ? lines.join("") : "Nie udało się zapisać. Sprawdź pola.");
+        return;
+      }
+
+      const id = String(data.id);
+      const label = String(data.label || id);
+
+      if (managerSel.tomselect) {
+        const ts = managerSel.tomselect;
+        ts.addOption({ value: id, text: label });
+        ts.refreshOptions(false);
+        ts.setValue(id, true);
+      } else {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = label;
+        managerSel.appendChild(opt);
+        managerSel.value = id;
+        managerSel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+
+      const bsModal = bootstrap.Modal.getInstance(modalEl);
+      if (bsModal) bsModal.hide();
+    } catch (e) {
+      showError("Błąd połączenia / zapisu. Spróbuj ponownie.");
+    } finally {
+      saveBtn.disabled = false;
+    }
+  }
+
+  saveBtn.addEventListener("click", saveManagerQuick);
+})();
+</script>
+
 {% endblock %}

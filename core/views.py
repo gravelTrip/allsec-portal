@@ -871,18 +871,70 @@ def workorder_edit(request, pk):
 # =========================
 @login_required
 def site_list(request):
-    qs = Site.objects.select_related("entity", "manager").order_by("name")
+    qs = Site.objects.select_related("manager", "entity").order_by("name")
+
+    # --- filtry ---
+    name = (request.GET.get("name") or "").strip()
+    address = (request.GET.get("address") or "").strip()
+    city = (request.GET.get("city") or "").strip()
+    manager = (request.GET.get("manager") or "").strip()
+
+    if name:
+        qs = qs.filter(name__icontains=name)
+
+    if address:
+        qs = qs.filter(
+            Q(street__icontains=address) |
+            Q(postal_code__icontains=address)
+        )
+
+    if city:
+        qs = qs.filter(city__iexact=city)
+
+    if manager:
+        qs = qs.filter(manager_id=manager)
+
+    # --- wybory do selectów ---
+    city_choices = (
+        Site.objects.exclude(city__isnull=True)
+        .exclude(city__exact="")
+        .order_by("city")
+        .values_list("city", flat=True)
+        .distinct()
+    )
+
+    manager_choices = Manager.objects.order_by("short_name", "full_name")
+
+    # --- paginacja + zachowanie filtrów w linkach paginacji ---
     paginator = Paginator(qs, 25)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
+
+    params = request.GET.copy()
+    params.pop("page", None)
+    qs_base = params.urlencode()
+
+    can_office = is_office(request.user)
 
     context = {
         "sites": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
-        "can_create": is_office(request.user),
+        "can_create": can_office,
+        "can_edit": can_office,
+        "qs_base": qs_base,
+
+        "filters": {
+            "name": name,
+            "address": address,
+            "city": city,
+            "manager": manager,
+        },
+        "city_choices": city_choices,
+        "manager_choices": manager_choices,
     }
     return render(request, "core/site_list.html", context)
+
 
 
 @login_required
@@ -926,6 +978,7 @@ def system_create_for_site(request, site_pk):
         "form": form,
         "site": site,
         "system": None,
+
     }
     return render(request, "core/system_form.html", context)
 
@@ -967,6 +1020,8 @@ def system_edit(request, pk):
         "form": form,
         "system": system,
         "site": system.site,
+        "entity_quick_form": EntityForm(prefix="entity_quick"),
+        "can_create_entity": is_office(request.user),
     }
     return render(request, "core/system_form.html", context)
 
@@ -1071,44 +1126,61 @@ def sitecontact_delete(request, pk):
 @login_required
 def site_create(request):
     if not is_office(request.user):
-        return HttpResponseForbidden("Brak uprawnień do tworzenia obiektów.")
+        return HttpResponseForbidden("Brak uprawnień.")
 
     if request.method == "POST":
         form = SiteForm(request.POST)
         if form.is_valid():
-            site = form.save()
-            return redirect("core:site_detail", pk=site.pk)
+            form.save()
+            return redirect("core:site_list")
     else:
         form = SiteForm()
 
-    context = {
+    # >>> DODANE: szybkie dodanie danych FV (modal)
+    entity_quick_form = EntityForm(prefix="entity_quick")
+    can_create_entity = is_office(request.user)
+    manager_quick_form = ManagerForm(prefix="manager_quick")
+    can_create_manager = is_office(request.user)
+
+    return render(request, "core/site_form.html", {
         "form": form,
         "site": None,
-    }
-    return render(request, "core/site_form.html", context)
+        "entity_quick_form": entity_quick_form,
+        "can_create_entity": can_create_entity,
+        "manager_quick_form": manager_quick_form,
+        "can_create_manager": can_create_manager,
+    })
 
 
 @login_required
 def site_edit(request, pk):
-    site = get_object_or_404(Site, pk=pk)
-
     if not is_office(request.user):
-        return HttpResponseForbidden("Brak uprawnień do edycji obiektu.")
+        return HttpResponseForbidden("Brak uprawnień.")
+
+    site = get_object_or_404(Site, pk=pk)
 
     if request.method == "POST":
         form = SiteForm(request.POST, instance=site)
-
         if form.is_valid():
             form.save()
             return redirect("core:site_detail", pk=site.pk)
     else:
         form = SiteForm(instance=site)
-    context = {
+
+    # >>> DODANE: szybkie dodanie danych FV (modal)
+    entity_quick_form = EntityForm(prefix="entity_quick")
+    can_create_entity = is_office(request.user)
+    manager_quick_form = ManagerForm(prefix="manager_quick")
+    can_create_manager = is_office(request.user)
+
+    return render(request, "core/site_form.html", {
         "form": form,
         "site": site,
-        "is_edit": True,
-    }
-    return render(request, "core/site_form.html", context)
+        "entity_quick_form": entity_quick_form,
+        "can_create_entity": can_create_entity,
+        "manager_quick_form": manager_quick_form,
+        "can_create_manager": can_create_manager,
+    })
 
 
 @login_required
@@ -1709,6 +1781,47 @@ def entity_create(request):
         "entity": None,
     }
     return render(request, "core/entity_form.html", context)
+
+@login_required
+@require_POST
+def entity_quick_create(request):
+    if not request.user.is_authenticated or not is_office(request.user):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    form = EntityForm(request.POST, prefix="entity_quick")
+    if form.is_valid():
+        entity = form.save()
+        return JsonResponse({
+            "ok": True,
+            "id": entity.pk,
+            "label": str(entity),  # albo entity.name jeśli wolisz
+        })
+
+    return JsonResponse({
+        "ok": False,
+        "errors": form.errors.get_json_data(escape_html=True),
+    }, status=400)
+
+@login_required
+@require_POST
+def manager_quick_create(request):
+    # uprawnienia jak w quick-create dla danych FV
+    if not is_office(request.user):
+        return JsonResponse(
+            {"ok": False, "errors": {"__all__": [{"message": "Brak uprawnień."}]}},
+            status=403
+        )
+
+    form = ManagerForm(request.POST, prefix="manager_quick")
+    if form.is_valid():
+        m = form.save()
+        label = m.short_name or m.full_name or str(m.pk)
+        return JsonResponse({"ok": True, "id": m.pk, "label": label})
+
+    return JsonResponse(
+        {"ok": False, "errors": form.errors.get_json_data()},
+        status=400
+    )
 
 
 @login_required
