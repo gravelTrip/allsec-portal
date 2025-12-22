@@ -1131,8 +1131,45 @@ def site_delete(request, pk):
 # =========================
 @login_required
 def manager_list(request):
-    qs = Manager.objects.order_by("short_name", "full_name")
-    paginator = Paginator(qs, 25)
+    qs = Manager.objects.all()
+
+    # --- Filtry ---
+    name = (request.GET.get("name") or "").strip()
+    nip = (request.GET.get("nip") or "").strip()
+    street = (request.GET.get("street") or "").strip()
+    city = (request.GET.get("city") or "").strip()
+
+    if name:
+        qs = qs.filter(
+            Q(short_name__icontains=name) |
+            Q(full_name__icontains=name)
+        )
+    if nip:
+        qs = qs.filter(nip__icontains=nip)
+    if street:
+        qs = qs.filter(street__icontains=street)
+    if city:
+        qs = qs.filter(city=city)
+
+    qs = qs.order_by("short_name", "full_name")
+
+    # lista miast do selecta
+    city_choices = (
+        Manager.objects
+        .exclude(city__isnull=True)
+        .exclude(city__exact="")
+        .values_list("city", flat=True)
+        .distinct()
+        .order_by("city")
+    )
+
+    # qs_base do paginacji (bez page=)
+    qd = request.GET.copy()
+    if "page" in qd:
+        qd.pop("page")
+    qs_base = qd.urlencode()
+
+    paginator = Paginator(qs, 20)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
@@ -1140,9 +1177,21 @@ def manager_list(request):
         "managers": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
+
+        "filters": {
+            "name": name,
+            "nip": nip,
+            "street": street,
+            "city": city,
+        },
+        "city_choices": list(city_choices),
+        "qs_base": qs_base,
+
         "can_create": is_office(request.user),
+        "can_edit": is_office(request.user),
     }
     return render(request, "core/manager_list.html", context)
+
 
 
 @login_required
@@ -1205,33 +1254,50 @@ def manager_edit(request, pk):
 
 @login_required
 def manager_delete(request, pk):
-    manager = get_object_or_404(Manager, pk=pk)
+    # Usuwanie wyłącznie z poziomu Django Admin (bezpiecznik)
+    return HttpResponseForbidden("Usuwanie zarządców jest dostępne wyłącznie w panelu admin.")
 
-    if not is_office(request.user):
-        return HttpResponseForbidden("Brak uprawnień do usuwania zarządcy.")
-
-    if request.method == "POST":
-        manager.delete()
-        return redirect("core:manager_list")
-
-    return redirect("core:manager_detail", pk=pk)
 
 
 # =========================
 # KONTAKTY (Contact)
 # =========================
-@login_required
 def contact_list(request):
-    qs = Contact.objects.select_related("manager").order_by("last_name", "first_name")
+    qs = Contact.objects.select_related("manager").all().order_by("last_name", "first_name")
+
+    name = request.GET.get("name", "").strip()
+    phone = request.GET.get("phone", "").strip()
+    email = request.GET.get("email", "").strip()
+    manager_id = request.GET.get("manager", "").strip()
+
+    if name:
+        qs = qs.filter(Q(first_name__icontains=name) | Q(last_name__icontains=name))
+    if phone:
+        qs = qs.filter(phone__icontains=phone)
+    if email:
+        qs = qs.filter(email__icontains=email)
+    if manager_id:
+        qs = qs.filter(manager_id=manager_id)
+
     paginator = Paginator(qs, 25)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page = request.GET.get("page")
+    page_obj = paginator.get_page(page)
+
+    # zachowujemy filtr w paginacji
+    filters = {"name": name, "phone": phone, "email": email, "manager": manager_id}
+    qs_base = "&".join(
+        f"{k}={v}" for k, v in filters.items() if v
+    )
 
     context = {
         "contacts": page_obj.object_list,
         "page_obj": page_obj,
         "paginator": paginator,
-        "can_create": is_office(request.user),
+        "filters": filters,
+        "manager_choices": Manager.objects.order_by("short_name", "full_name"),
+        "qs_base": qs_base,
+        "can_create": request.user.has_perm("core.add_contact"),
+        "can_edit": request.user.has_perm("core.change_contact"),
     }
     return render(request, "core/contact_list.html", context)
 

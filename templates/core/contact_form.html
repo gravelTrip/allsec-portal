@@ -90,4 +90,34 @@
       </form>
     </div>
   </div>
+
+<script>
+(function () {
+  function initManagerTomSelect() {
+    const managerSel = document.getElementById("id_manager");
+    if (!managerSel) return;
+
+    // TomSelect z base.html ładuje się NA KOŃCU strony, więc na wszelki wypadek retry
+    if (!window.TomSelect) {
+      setTimeout(initManagerTomSelect, 50);
+      return;
+    }
+
+    if (managerSel.tomselect) return;
+
+    new TomSelect(managerSel, {
+      allowEmptyOption: true,
+      placeholder: "Wybierz zarządcę…",
+      plugins: ["clear_button"],
+      create: false,
+      // dla selecta z <option> szukamy po "text" (etykiecie)
+      searchField: ["text"],
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initManagerTomSelect);
+})();
+</script>
+
+
 {% endblock %}

@@ -1,118 +1,169 @@
 {% extends "base.html" %}
-
 {% block title %}Kontakty – ALLSEC Portal{% endblock %}
-
 {% block content %}
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-0">Kontakty</h1>
-      <p class="text-muted small mb-0">
-        Osoby kontaktowe zarządców, administratorów, właścicieli itp.
-      </p>
-    </div>
 
-    {% if can_create %}
-      <a href="{% url 'core:contact_create' %}" class="btn btn-primary btn-sm">
-        + Nowy kontakt
-      </a>
-    {% endif %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 class="h3 mb-0">Kontakty</h1>
+    <p class="text-muted small mb-0">Osoby kontaktowe zarządców, administratorów, właścicieli itp.</p>
   </div>
 
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-0">
-      <table class="table table-hover mb-0 align-middle">
-        <thead class="table-light">
-          <tr>
-            <th>Kontakt</th>
-            <th>Telefon</th>
-            <th>E-mail</th>
-            <th>Zarządca</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% if contacts %}
-            {% for contact in contacts %}
-              <tr>
-                <td>{{ contact }}</td>
-                <td>
-                  {% if contact.phone %}
-                    {{ contact.phone }}
-                  {% else %}
-                    <span class="text-muted small">brak</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if contact.email %}
-                    {{ contact.email }}
-                  {% else %}
-                    <span class="text-muted small">brak</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if contact.manager %}
-                    {{ contact.manager.short_name|default:contact.manager.full_name }}
-                  {% else %}
-                    <span class="text-muted small">brak</span>
-                  {% endif %}
-                </td>
-                <td class="text-end">
-                  <a href="{% url 'core:contact_detail' contact.pk %}"
-                     class="btn btn-sm btn-primary">
-                    Szczegóły
-                  </a>
-                </td>
-              </tr>
-            {% endfor %}
-          {% else %}
+  {% if can_create %}
+    <a href="{% url 'core:contact_create' %}" class="btn btn-success btn-sm">
+      + Nowy kontakt
+    </a>
+  {% endif %}
+</div>
+
+<div class="card shadow-sm border-0">
+  <div class="card-header bg-white">
+    <form method="get" id="contact-filters-form" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Nazwa</label>
+        <input type="search" name="name" value="{{ filters.name }}" class="form-control form-control-sm contact-filter-text" placeholder="Imię lub nazwisko…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Telefon</label>
+        <input type="search" name="phone" value="{{ filters.phone }}" class="form-control form-control-sm contact-filter-text" placeholder="np. 500…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">E-mail</label>
+        <input type="search" name="email" value="{{ filters.email }}" class="form-control form-control-sm contact-filter-text" placeholder="np. biuro@…">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label form-label-sm mb-1">Zarządca</label>
+        <select name="manager" id="contact-filter-manager" class="form-select form-select-sm">
+          <option value="">Wszyscy</option>
+          {% for m in manager_choices %}
+            <option value="{{ m.id }}" {% if m.id|stringformat:"s" == filters.manager %}selected{% endif %}>
+              {{ m.short_name|default:m.full_name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 d-flex justify-content-end mt-1">
+        <a href="{% url 'core:contact_list' %}" class="btn btn-sm btn-outline-secondary">Resetuj</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0 align-middle">
+      <thead class="table-light">
+        <tr class="small text-muted">
+          <th>Nazwa</th>
+          <th>Telefon</th>
+          <th>E-mail</th>
+          <th>Zarządca</th>
+          <th class="text-end"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if contacts %}
+          {% for c in contacts %}
             <tr>
-              <td colspan="5" class="text-center text-muted small py-4">
-                Brak kontaktów w bazie.
+              <td>
+                <a href="{% url 'core:contact_detail' c.pk %}" class="text-reset text-decoration-none fw-semibold">
+                  {{ c.first_name }} {{ c.last_name }}
+                </a>
+              </td>
+              <td>{{ c.phone|default:"—" }}</td>
+              <td>
+                {% if c.email %}
+                  <a href="mailto:{{ c.email }}" class="text-reset text-decoration-none">{{ c.email }}</a>
+                {% else %}
+                  <span class="text-muted small">brak</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if c.manager %}
+                  {{ c.manager.short_name|default:c.manager.full_name }}
+                {% else %}
+                  <span class="text-muted small">brak</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                {% if can_edit %}
+                  <a href="{% url 'core:contact_edit' c.pk %}" class="btn btn-sm btn-primary btn-icon-square" title="Edytuj">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                {% endif %}
               </td>
             </tr>
-          {% endif %}
-        </tbody>
-      </table>
-    </div>
-
-    {% if page_obj and page_obj.paginator.num_pages > 1 %}
-      <div class="card-footer bg-white border-0">
-        <nav aria-label="Paginacja kontaktów">
-          <ul class="pagination pagination-sm mb-0 justify-content-end">
-            {% if page_obj.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">«</span>
-              </li>
-            {% endif %}
-
-            {% for num in paginator.page_range %}
-              {% if num == page_obj.number %}
-                <li class="page-item active" aria-current="page">
-                  <span class="page-link">{{ num }}</span>
-                </li>
-              {% elif num > page_obj.number|add:"-3" and num < page_obj.number|add:"3" %}
-                <li class="page-item">
-                  <a class="page-link" href="?page={{ num }}">{{ num }}</a>
-                </li>
-              {% endif %}
-            {% endfor %}
-
-            {% if page_obj.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a>
-              </li>
-            {% else %}
-              <li class="page-item disabled">
-                <span class="page-link">»</span>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
-      </div>
-    {% endif %}
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="5" class="text-center text-muted small py-3">Brak kontaktów w bazie.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
   </div>
+
+  {% if page_obj and page_obj.paginator.num_pages > 1 %}
+    <div class="card-footer bg-white border-0">
+      <nav aria-label="Paginacja kontaktów">
+        <ul class="pagination pagination-sm mb-0 justify-content-end">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ page_obj.previous_page_number }}">«</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">«</span></li>
+          {% endif %}
+          {% for num in page_obj.paginator.page_range %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+              <a class="page-link" href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ num }}">{{ num }}</a>
+            </li>
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?{% if qs_base %}{{ qs_base }}&{% endif %}page={{ page_obj.next_page_number }}">»</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">»</span></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+
+<script>
+(function () {
+  const form = document.getElementById("contact-filters-form");
+  if (!form) return;
+
+  const submitNow = () => { if (form.requestSubmit) form.requestSubmit(); else form.submit(); };
+
+  form.querySelectorAll("select").forEach(sel => sel.addEventListener("change", submitNow));
+
+  let t=null;
+  form.querySelectorAll(".contact-filter-text").forEach(inp=>{
+    inp.addEventListener("input",(e)=>{
+      if(e.isComposing) return;
+      clearTimeout(t);
+      if(inp.value.length && inp.value.length<2) return;
+      t=setTimeout(submitNow, 800);
+    });
+    inp.addEventListener("keydown",(e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); clearTimeout(t); submitNow(); }
+    });
+  });
+
+  function initManagerTomSelect() {
+    const managerSel = document.getElementById("contact-filter-manager");
+    if (!managerSel) return;
+
+    if (!window.TomSelect) { setTimeout(initManagerTomSelect, 50); return; }
+    if (managerSel.tomselect) return;
+
+    new TomSelect(managerSel, {
+      allowEmptyOption: true,
+      placeholder: "",
+      plugins: ["clear_button", "dropdown_input"],  // dropdown_input = piszesz w polu wyszukiwania, nie "obok"
+      create: false,
+      openOnFocus: true
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initManagerTomSelect);
+})();
+</script>
+
+
 {% endblock %}

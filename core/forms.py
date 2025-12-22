@@ -583,6 +583,53 @@ class EntityForm(forms.ModelForm):
 
 
 class ManagerForm(forms.ModelForm):
+    """Formularz zarządcy.
+
+    W UI/CRM chcemy wymusić komplet danych (poza notatką),
+    nawet jeśli w modelu część pól jest ustawiona jako blank=True.
+    """
+
+    REQUIRED_FIELDS = ("short_name", "full_name", "nip", "street", "postal_code", "city")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Wymuszamy required w formularzu (server-side) + atrybuty required w HTML
+        for fname in self.REQUIRED_FIELDS:
+            if fname in self.fields:
+                self.fields[fname].required = True
+                self.fields[fname].widget.attrs["required"] = "required"
+
+        # Notatka ma być opcjonalna
+        if "notes" in self.fields:
+            self.fields["notes"].required = False
+            self.fields["notes"].widget.attrs.pop("required", None)
+
+        # Drobne UX
+        if "postal_code" in self.fields:
+            self.fields["postal_code"].widget.attrs.setdefault("placeholder", "00-000")
+
+    def clean_short_name(self):
+        return (self.cleaned_data.get("short_name") or "").strip()
+
+    def clean_full_name(self):
+        return (self.cleaned_data.get("full_name") or "").strip()
+
+    def clean_nip(self):
+        return (self.cleaned_data.get("nip") or "").strip()
+
+    def clean_street(self):
+        return (self.cleaned_data.get("street") or "").strip()
+
+    def clean_city(self):
+        return (self.cleaned_data.get("city") or "").strip()
+
+    def clean_postal_code(self):
+        val = (self.cleaned_data.get("postal_code") or "").strip()
+        if not re.match(r"^\d{2}-\d{3}$", val):
+            raise forms.ValidationError("Wpisz kod w formacie XX-XXX.")
+        return val
+
     class Meta:
         model = Manager
         fields = [
@@ -595,23 +642,18 @@ class ManagerForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "short_name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "full_name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
+            "short_name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "full_name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "nip": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "street": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
-            "postal_code": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
+            "postal_code": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "city": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
-            "notes": forms.Textarea(
-                attrs={"class": "form-control form-control-sm", "rows": 3}
-            ),
+            "notes": forms.Textarea(attrs={"class": "form-control form-control-sm", "rows": 4}),
         }
 
+
+
+# core/forms.py
 
 class ContactForm(forms.ModelForm):
     class Meta:
@@ -625,21 +667,33 @@ class ContactForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "first_name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
-            "last_name": forms.TextInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
+            "first_name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "last_name": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "phone": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
-            "email": forms.EmailInput(
-                attrs={"class": "form-control form-control-sm"}
-            ),
+            "email": forms.EmailInput(attrs={"class": "form-control form-control-sm"}),
             "manager": forms.Select(attrs={"class": "form-select form-select-sm"}),
-            "notes": forms.Textarea(
-                attrs={"class": "form-control form-control-sm", "rows": 3}
-            ),
+            "notes": forms.Textarea(attrs={"class": "form-control form-control-sm", "rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["first_name"].required = True
+        self.fields["last_name"].required = True
+        self.fields["phone"].required = True
+
+        # WYMAGANE: Imię, Nazwisko, Telefon (na poziomie formularza, bez zmiany modelu)
+        for field_name in ("first_name", "last_name", "phone"):
+            f = self.fields.get(field_name)
+            if f:
+                f.required = True
+                f.error_messages = {**f.error_messages, "required": "To pole jest wymagane."}
+
+        # Zarządca opcjonalny, ale bez "---------"
+        manager_field = self.fields.get("manager")
+        if manager_field is not None:
+            manager_field.required = False
+            manager_field.empty_label = ""  # TomSelect pokaże placeholder
+
 
 class BootstrapModelForm(forms.ModelForm):
     """Bazowy ModelForm, który dorzuca klasy Bootstrap do pól."""

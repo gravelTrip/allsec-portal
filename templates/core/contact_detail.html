@@ -22,20 +22,14 @@
          class="btn btn-sm btn-outline-secondary">
         ← Lista kontaktów
       </a>
+
       {% if can_edit %}
         <a href="{% url 'core:contact_edit' contact.pk %}"
            class="btn btn-sm btn-primary">
           Edytuj
         </a>
-        <form method="post"
-              action="{% url 'core:contact_delete' contact.pk %}"
-              onsubmit="return confirm('Na pewno usunąć ten kontakt?');">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-sm btn-outline-danger">
-            Usuń
-          </button>
-        </form>
       {% endif %}
+      {# USUWANIE WYŁĄCZONE z UI #}
     </div>
   </div>
 
@@ -84,27 +78,34 @@
         <div class="card-header bg-white">
           <h6 class="mb-0">Powiązane obiekty</h6>
         </div>
-        <div class="card-body small">
+
+        {# MINI LISTA jak w Dane FV #}
+        <div class="card-body p-0">
           {% if site_links %}
-            <ul class="mb-0">
+            <div class="list-group list-group-flush">
               {% for link in site_links %}
-                <li>
-                  <a href="{% url 'core:site_detail' link.site.pk %}">
-                    {{ link.site.name }}
-                  </a>
-                  <span class="text-muted">
-                    – {{ link.get_role_display }}
-                  </span>
-                  {% if link.is_default_for_notifications %}
-                    <span class="badge bg-primary ms-1">domyślny</span>
-                  {% endif %}
-                </li>
+                <a href="{% url 'core:site_detail' link.site.pk %}"
+                   class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                  <div class="me-2">
+                    <div class="fw-semibold small">{{ link.site.name }}</div>
+                    <div class="text-muted small">
+                      {{ link.get_role_display }}
+                    </div>
+                  </div>
+
+                  <div class="d-flex align-items-center gap-2">
+                    {% if link.is_default_for_notifications %}
+                      <span class="badge bg-primary">domyślny</span>
+                    {% endif %}
+                    <i class="bi bi-chevron-right text-muted"></i>
+                  </div>
+                </a>
               {% endfor %}
-            </ul>
+            </div>
           {% else %}
-            <p class="text-muted small mb-0">
+            <div class="p-3 small text-muted">
               Ten kontakt nie jest jeszcze przypisany do żadnego obiektu.
-            </p>
+            </div>
           {% endif %}
         </div>
       </div>

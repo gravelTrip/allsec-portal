@@ -9,44 +9,66 @@
         {{ manager.short_name|default:manager.full_name }}
       </h1>
       <p class="mb-0 text-muted small">
-        {% if manager.street %}
-          {{ manager.street }}, 
-        {% endif %}
-        {{ manager.postal_code }} {{ manager.city }}
+        Zarządca
       </p>
-      {% if manager.nip %}
-        <p class="mb-0 text-muted small">
-          NIP: {{ manager.nip }}
-        </p>
-      {% endif %}
     </div>
 
     <div class="d-flex align-items-center gap-2">
-      <a href="{% url 'core:manager_list' %}"
-         class="btn btn-sm btn-outline-secondary">
+      <a href="{% url 'core:manager_list' %}" class="btn btn-sm btn-outline-secondary">
         ← Lista zarządców
       </a>
+
       {% if can_edit %}
-        <a href="{% url 'core:manager_edit' manager.pk %}"
-           class="btn btn-sm btn-primary">
+        <a href="{% url 'core:manager_edit' manager.pk %}" class="btn btn-sm btn-primary">
           Edytuj
         </a>
-        <form method="post"
-              action="{% url 'core:manager_delete' manager.pk %}"
-              onsubmit="return confirm('Na pewno usunąć tego zarządcę?');">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-sm btn-outline-danger">
-            Usuń
-          </button>
-        </form>
       {% endif %}
     </div>
   </div>
 
-  <div class="row">
-    <div class="col-lg-6">
+  <div class="row g-3">
+    <!-- LEWA: karta danych -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white">
+          <h6 class="mb-0">Dane zarządcy</h6>
+        </div>
+        <div class="card-body small">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 text-muted">Nazwa</dt>
+            <dd class="col-sm-8">
+              {{ manager.short_name|default:"—" }}
+            </dd>
+
+            <dt class="col-sm-4 text-muted">Pełna nazwa</dt>
+            <dd class="col-sm-8">
+              {{ manager.full_name|default:"—" }}
+            </dd>
+
+            <dt class="col-sm-4 text-muted">NIP</dt>
+            <dd class="col-sm-8">
+              {{ manager.nip|default:"—" }}
+            </dd>
+
+            <dt class="col-sm-4 text-muted">Adres</dt>
+            <dd class="col-sm-8">
+              {% if manager.street %}{{ manager.street }}{% else %}—{% endif %}
+            </dd>
+
+            <dt class="col-sm-4 text-muted">Kod / Miasto</dt>
+            <dd class="col-sm-8">
+              {% if manager.postal_code or manager.city %}
+                {{ manager.postal_code }} {{ manager.city }}
+              {% else %}
+                —
+              {% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+
       {% if manager.notes %}
-        <div class="card shadow-sm border-0 mb-3">
+        <div class="card shadow-sm border-0 mt-3">
           <div class="card-header bg-white">
             <h6 class="mb-0">Notatki</h6>
           </div>
@@ -57,50 +79,92 @@
       {% endif %}
     </div>
 
-    <div class="col-lg-6">
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h6 class="mb-0">Obiekty tego zarządcy</h6>
-        </div>
-        <div class="card-body small">
-          {% if sites %}
-            <ul class="mb-0">
-              {% for site in sites %}
-                <li>
-                  <a href="{% url 'core:site_detail' site.pk %}">
-                    {{ site.name }}
-                  </a>
-                  <span class="text-muted small">
-                    – {{ site.city }}
-                  </span>
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-muted small mb-0">Brak obiektów powiązanych.</p>
-          {% endif %}
-        </div>
-      </div>
+    <!-- PRAWA: zwijane listy -->
+    <div class="col-lg-7">
+      <div class="accordion" id="managerRelationsAccordion">
 
-      <div class="card shadow-sm border-0 mb-3">
-        <div class="card-header bg-white">
-          <h6 class="mb-0">Kontakty u zarządcy</h6>
+        <!-- Obiekty -->
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingSites">
+            <button class="accordion-button" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapseSites"
+                    aria-expanded="true"
+                    aria-controls="collapseSites">
+              Obiekty tego zarządcy
+              <span class="badge bg-light text-dark border ms-2">{{ sites|length }}</span>
+            </button>
+          </h2>
+          <div id="collapseSites" class="accordion-collapse collapse show"
+               aria-labelledby="headingSites"
+               data-bs-parent="#managerRelationsAccordion">
+            <div class="accordion-body p-0">
+              {% if sites %}
+                <div class="list-group list-group-flush">
+                  {% for site in sites %}
+                    <a href="{% url 'core:site_detail' site.pk %}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                      <div class="me-2">
+                        <div class="fw-semibold small">{{ site.name }}</div>
+                        <div class="text-muted small">{{ site.city }}</div>
+                      </div>
+                      <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="p-3 small text-muted">
+                  Brak obiektów powiązanych.
+                </div>
+              {% endif %}
+            </div>
+          </div>
         </div>
-        <div class="card-body small">
-          {% if contacts %}
-            <ul class="mb-0">
-              {% for contact in contacts %}
-                <li>
-                  <a href="{% url 'core:contact_detail' contact.pk %}">
-                    {{ contact }}
-                  </a>
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <p class="text-muted small mb-0">Brak zdefiniowanych kontaktów.</p>
-          {% endif %}
+
+        <!-- Kontakty -->
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="headingContacts">
+            <button class="accordion-button collapsed" type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#collapseContacts"
+                    aria-expanded="false"
+                    aria-controls="collapseContacts">
+              Kontakty u zarządcy
+              <span class="badge bg-light text-dark border ms-2">{{ contacts|length }}</span>
+            </button>
+          </h2>
+          <div id="collapseContacts" class="accordion-collapse collapse"
+               aria-labelledby="headingContacts"
+               data-bs-parent="#managerRelationsAccordion">
+            <div class="accordion-body p-0">
+              {% if contacts %}
+                <div class="list-group list-group-flush">
+                  {% for contact in contacts %}
+                    <a href="{% url 'core:contact_detail' contact.pk %}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                      <div class="me-2">
+                        <div class="fw-semibold small">
+                          {{ contact.first_name }} {{ contact.last_name }}
+                        </div>
+                        <div class="text-muted small">
+                          {% if contact.phone %}{{ contact.phone }}{% endif %}
+                          {% if contact.phone and contact.email %} · {% endif %}
+                          {% if contact.email %}{{ contact.email }}{% endif %}
+                        </div>
+                      </div>
+                      <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="p-3 small text-muted">
+                  Brak zdefiniowanych kontaktów.
+                </div>
+              {% endif %}
+            </div>
+          </div>
         </div>
+
       </div>
     </div>
   </div>
