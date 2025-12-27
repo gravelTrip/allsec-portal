@@ -182,6 +182,10 @@
               <div class="form-text small">
                 Zaznacz systemy, których dotyczy zlecenie. Lista jest filtrowana po wybranym obiekcie.
               </div>
+                <div id="systems-default-hint" class="form-text small text-muted d-none">
+    Dla <strong>konserwacji</strong>: jeśli nie zaznaczysz żadnego systemu,
+    zlecenie zapisze się z <strong>wszystkimi systemami objętymi umową</strong> dla wybranego obiektu.
+  </div>
 
               {{ form.systems }} {# ukryte inputy dla Django #}
 
@@ -454,6 +458,14 @@ document.addEventListener("DOMContentLoaded", function () {
     document.querySelector('[name="work_type"]');
 
   if (!workTypeEl) return;
+
+    const systemsDefaultHint = document.getElementById("systems-default-hint");
+  function refreshSystemsDefaultHint() {
+    if (!systemsDefaultHint) return;
+    systemsDefaultHint.classList.toggle("d-none", workTypeEl.value !== "MAINTENANCE");
+  }
+  workTypeEl.addEventListener("change", refreshSystemsDefaultHint);
+  refreshSystemsDefaultHint();
 
   const els = {
     visitType: document.getElementById("id_visit_type") || document.querySelector('[name="visit_type"]'),

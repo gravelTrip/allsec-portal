@@ -727,6 +727,18 @@ def workorder_create(request):
         if form.is_valid():
             order = form.save()
 
+            # HOTFIX: Konserwacja -> brak wyboru systemów = wszystkie z umowy (fallback: wszystkie na obiekcie)
+            if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE and order.site_id:
+                selected = form.cleaned_data.get("systems")
+                if not selected or selected.count() == 0:
+                    default_qs = System.objects.filter(
+                        site=order.site,
+                        in_service_contract=True,
+                    ).order_by("sort_order", "id")
+                    if not default_qs.exists():
+                        default_qs = System.objects.filter(site=order.site).order_by("sort_order", "id")
+                    order.systems.set(default_qs)
+
             # jeśli to zlecenie przeglądu okresowego – tworzymy protokół KS
             if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE:
                 # zabezpieczenie: nie twórz dwa razy
@@ -819,6 +831,19 @@ def workorder_edit(request, pk):
         form = WorkOrderForm(request.POST, instance=order)
         if form.is_valid():
             order = form.save()
+
+            
+            # HOTFIX: Konserwacja -> brak wyboru systemów = wszystkie z umowy (fallback: wszystkie na obiekcie)
+            if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE and order.site_id:
+                selected = form.cleaned_data.get("systems")
+                if not selected or selected.count() == 0:
+                    default_qs = System.objects.filter(
+                        site=order.site,
+                        in_service_contract=True,
+                    ).order_by("sort_order", "id")
+                    if not default_qs.exists():
+                        default_qs = System.objects.filter(site=order.site).order_by("sort_order", "id")
+                    order.systems.set(default_qs)
 
             # ✅ NOWE: jeśli to MAINTENANCE i jest protokół KS – aktualizuj datę wykonania z terminu zlecenia
             if order.work_type == WorkOrder.WorkOrderType.MAINTENANCE and hasattr(order, "maintenance_protocol"):
