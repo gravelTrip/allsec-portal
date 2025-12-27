@@ -240,57 +240,72 @@
     (function() {
       const siteSelect = document.getElementById("id_site");
       const container = document.getElementById("systems-container");
+      if (!container) return;
+      const systemsBox = container;
+
       const selectedAttr = container ? (container.dataset.selected || "") : "";
-      let initiallySelected = selectedAttr ? selectedAttr.split(",") : [];
+      let initiallySelected = selectedAttr
+        ? selectedAttr.split(",").map(s => s.trim()).filter(Boolean)
+        : [];
 
       function renderSystems(systems) {
-        if (!container) return;
-
-        container.innerHTML = "";
-
-        if (!systems.length) {
-          container.innerHTML = '<p class="text-muted small mb-0">Brak systemów przypisanych do tego obiektu.</p>';
+        systemsBox.innerHTML = "";
+        if (!systems || !systems.length) {
+          systemsBox.innerHTML = '<div class="text-muted small">Brak systemów na obiekcie.</div>';
           return;
         }
 
-        systems.forEach(function(sys) {
-          const idStr = String(sys.id);
+        const frag = document.createDocumentFragment();
 
+        systems.forEach(sys => {
           const wrapper = document.createElement("div");
-          wrapper.className = "form-check small mb-1";
+          wrapper.className = "form-check mb-1";
 
           const input = document.createElement("input");
           input.type = "checkbox";
           input.className = "form-check-input";
           input.name = "systems";
-          input.value = idStr;
-          input.id = "system_" + idStr;
-
-          // zaznaczenie przy edycji istniejącego zlecenia
-          if (initiallySelected.includes(idStr)) {
+          input.value = sys.id;
+          if (initiallySelected.includes(String(sys.id))) {
             input.checked = true;
           }
 
           const label = document.createElement("label");
-          label.className = "form-check-label d-flex align-items-center gap-1";
-          label.setAttribute("for", input.id);
+          label.className = "form-check-label ms-1";
 
-          const textSpan = document.createElement("span");
-          textSpan.textContent = sys.label;
-          label.appendChild(textSpan);
+          // fallback, gdyby backend kiedyś nie dał label
+          let labelText = sys.label;
+          if (!labelText) {
+            const base = sys.system_type_display || sys.system_type || sys.name || `System #${sys.id}`;
+            const bits = [base, sys.manufacturer, sys.model].filter(Boolean);
+            labelText = bits.join(" ");
+            const loc = sys.location_info || sys.location;
+            if (loc) labelText += ` — ${loc}`;
+          }
 
-          if (sys.in_contract) {
+          label.textContent = labelText;
+
+          const inContract = !!(sys.in_contract || sys.in_service_contract);
+          if (inContract) {
             const badge = document.createElement("span");
-            badge.className = "badge bg-success ms-1";
-            badge.textContent = "w umowie";
+            badge.className = "badge bg-success ms-2";
+            badge.textContent = "Umowa";
+            label.appendChild(badge);
+          } else {
+            const badge = document.createElement("span");
+            badge.className = "badge bg-secondary ms-2";
+            badge.textContent = "Brak umowy";
             label.appendChild(badge);
           }
 
           wrapper.appendChild(input);
           wrapper.appendChild(label);
-          container.appendChild(wrapper);
+          frag.appendChild(wrapper);
         });
+
+        systemsBox.appendChild(frag);
       }
+
 
       function fetchSystems(siteId) {
         if (!container) return;

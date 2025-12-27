@@ -7,14 +7,18 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from datetime import date, timedelta
 from django.http import HttpResponseForbidden, JsonResponse
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, Case, When, Value, IntegerField
+from django.db import transaction
+
+from django.core.exceptions import FieldDoesNotExist
+
 
 from django.urls import reverse
 
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_POST
 
-import re
+import re, json
 
 from django.conf import settings
 
@@ -695,15 +699,16 @@ def workorder_detail(request, pk):
         pk=pk,
     )
 
+    # ✅ systemy przypisane do zlecenia w kolejności z obiektu (sort_order)
+    systems = order.systems.all().order_by("sort_order", "id")
+
     protocol = getattr(order, "maintenance_protocol", None)
-
-    # spróbujemy wyciągnąć powiązany protokół serwisowy (jeśli istnieje)
     service_report = getattr(order, "service_report", None)
-
     can_edit = is_office(request.user)
 
     context = {
         "order": order,
+        "systems": systems,   # ✅ NOWE
         "service_report": service_report,
         "can_edit": can_edit,
         "maintenance_protocol": protocol,
@@ -946,7 +951,8 @@ def site_detail(request, pk):
         pk=pk,
     )
 
-    systems = site.systems.all().order_by("system_type", "name")
+    systems = System.objects.filter(site=site).order_by("sort_order", "id")
+
     site_contacts = site.site_contacts.select_related("contact").all().order_by("role")
 
     context = {
@@ -1448,42 +1454,113 @@ def contact_delete(request, pk):
 
     return redirect("core:contact_detail", pk=pk)
 
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
 @login_required
 def ajax_site_systems(request, site_id):
-    # dostęp: biuro + (w przyszłości) serwisanci
-    if not (is_office(request.user) or is_technician(request.user)):
-        return JsonResponse({"detail": "Forbidden"}, status=403)
+    """
+    JSON dla formularza zlecenia: systemy dla wybranego obiektu.
+    Zwraca etykietę (label) + kolejność wg sort_order (jeśli istnieje).
+    """
+    if request.method != "GET":
+        return JsonResponse({"systems": []})
 
-    systems = (
-        System.objects.filter(site_id=site_id)
-        .order_by("system_type", "manufacturer", "model")
-    )
+    # sortowanie wg sort_order jeśli pole istnieje, inaczej po id
+    sort_field = "id"
+    try:
+        System._meta.get_field("sort_order")
+        sort_field = "sort_order"
+    except Exception:
+        sort_field = "id"
 
-    data = []
-    for s in systems:
-        parts = [s.get_system_type_display()]
-        if s.manufacturer:
-            parts.append(str(s.manufacturer))
-        if s.model:
-            parts.append(str(s.model))
-        label = " – ".join(parts)
+    qs = System.objects.filter(site_id=site_id).order_by(sort_field, "id")
 
-        # flaga: czy system jest w umowie
-        in_contract_flag = getattr(
-            s,
-            "in_service_contract",
-            getattr(s, "in_contract", False),
+    systems = []
+    for sys in qs:
+        # typ systemu (ładna etykieta)
+        try:
+            sys_type = sys.get_system_type_display()
+        except Exception:
+            sys_type = str(getattr(sys, "system_type", "")) or "System"
+
+        manufacturer = (getattr(sys, "manufacturer", "") or "").strip()
+        model = (getattr(sys, "model", "") or "").strip()
+
+        # u Ciebie jest location_info (a nie location) – robimy fallback żeby było odporne
+        loc = (getattr(sys, "location_info", None) or getattr(sys, "location", None) or "").strip()
+
+        label = sys_type
+        mm = " ".join([p for p in [manufacturer, model] if p]).strip()
+        if mm:
+            label += f" – {mm}"
+        if loc:
+            label += f" ({loc})"
+
+        systems.append({
+            "id": sys.id,
+            "label": label,
+            "in_contract": bool(getattr(sys, "in_service_contract", False)),
+        })
+
+    return JsonResponse({"systems": systems})
+
+
+@require_POST
+@login_required
+def ajax_site_systems_reorder(request, site_id):
+    if not is_office(request.user):
+        return JsonResponse({"ok": False, "error": "Brak uprawnień"}, status=403)
+
+    site = get_object_or_404(Site, pk=site_id)
+
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Nieprawidłowy JSON"}, status=400)
+
+    order = payload.get("order", [])
+    if not isinstance(order, list) or not order:
+        return JsonResponse({"ok": False, "error": "Brak listy 'order'."}, status=400)
+
+    # normalizacja do intów + walidacja duplikatów
+    try:
+        order_ids = [int(x) for x in order]
+    except Exception:
+        return JsonResponse({"ok": False, "error": "Order zawiera nieprawidłowe ID."}, status=400)
+
+    if len(order_ids) != len(set(order_ids)):
+        return JsonResponse({"ok": False, "error": "Duplikaty w liście order."}, status=400)
+
+    qs = System.objects.filter(site=site)
+    existing_ids = list(qs.values_list("id", flat=True))
+
+    # wymagamy pełnej listy (żeby nie robić pół-porządku)
+    if set(order_ids) != set(existing_ids):
+        return JsonResponse(
+            {"ok": False, "error": "Lista order nie pasuje do systemów obiektu (brak/nadmiar)."},
+            status=400
         )
 
-        data.append(
-            {
-                "id": s.id,
-                "label": label,                     # UWAGA: bez "(w umowie)"
-                "in_contract": bool(in_contract_flag),  # flaga do badga
-            }
-        )
+    # zapis kolejności: 1..N (możesz zmienić na 10.. co 10 jeśli wolisz)
+    to_update = []
+    pos = 1
+    id_to_obj = {s.id: s for s in qs}
+    for sid in order_ids:
+        obj = id_to_obj.get(sid)
+        if not obj:
+            continue
+        obj.sort_order = pos
+        pos += 1
+        to_update.append(obj)
 
-    return JsonResponse({"systems": data})
+    with transaction.atomic():
+        System.objects.bulk_update(to_update, ["sort_order"])
+
+    return JsonResponse({"ok": True})
+
+
+
 
 @login_required
 def service_report_edit(request, pk):
@@ -1891,7 +1968,12 @@ def maintenance_protocol_edit(request, pk):
     work_order = protocol.work_order
 
     # Wszystkie sekcje z punktami
-    sections_qs = protocol.sections.all().prefetch_related("check_items")
+    sections_qs = (
+        protocol.sections
+        .select_related("system")
+        .prefetch_related("check_items")
+        .order_by("system__sort_order", "system__id", "order", "id")
+    )
 
     if request.method == "POST":
         form = MaintenanceProtocolForm(request.POST, instance=protocol)
@@ -1960,11 +2042,18 @@ def maintenance_protocol_detail(request, pk):
         pk=pk,
     )
 
+    sections = (
+        protocol.sections
+        .select_related("system")
+        .prefetch_related("check_items")
+        .order_by("system__sort_order", "system__id", "order", "id")
+    )
+
     context = {
         "protocol": protocol,
         "site": protocol.site,
         "work_order": protocol.work_order,
-        "sections": protocol.sections.all().prefetch_related("check_items"),
+        "sections": sections,
         "can_edit": True,  # na razie prosto – każdy zalogowany; później możemy ograniczyć do biura
         # "can_edit": is_office(request.user),  # jeśli chcesz od razu tylko biuro
     }
@@ -1979,7 +2068,12 @@ def maintenance_protocol_pdf(request, pk):
         pk=pk,
     )
 
-    sections = protocol.sections.all().prefetch_related("check_items")
+    sections = (
+    protocol.sections
+    .select_related("system")
+    .prefetch_related("check_items")
+    .order_by("system__sort_order", "system__id", "order", "id")
+)
 
     base_name = protocol.number or f"KS_{protocol.pk}"
     safe_name = base_name.replace("/", "_").replace("\\", "_")

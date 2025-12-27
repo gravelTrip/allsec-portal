@@ -493,15 +493,30 @@ class System(models.Model):
     created_at = models.DateTimeField("Utworzono", auto_now_add=True)
     updated_at = models.DateTimeField("Zaktualizowano", auto_now=True)
 
+    sort_order = models.PositiveIntegerField("Kolejność", default=0, db_index=True)
+
     class Meta:
         verbose_name = "System na obiekcie"
         verbose_name_plural = "Systemy na obiektach"
+        ordering = ("sort_order", "id")
 
     def __str__(self):
         base = self.get_system_type_display()
         if self.name:
             base = f"{self.name} ({base})"
         return f"{base} – {self.site}"
+    
+    def save(self, *args, **kwargs):
+        # ustaw kolejność tylko przy tworzeniu nowego systemu (żeby nie przestawiać istniejących)
+        if not self.pk and self.site_id and (self.sort_order is None or self.sort_order == 0):
+            max_order = (
+                System.objects.filter(site_id=self.site_id)
+                .aggregate(m=models.Max("sort_order"))
+                .get("m") or 0
+            )
+            self.sort_order = max_order + 1
+
+        super().save(*args, **kwargs)
     
     def get_maintenance_category(self) -> str | None:
         """

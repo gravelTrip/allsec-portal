@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-
+{% load static %}
 {% block title %}Obiekt {{ site.name }} – ALLSEC Portal{% endblock %}
 
 {% block content %}
@@ -141,32 +141,82 @@
       </div>
       <div class="card-body small">
         {% if systems %}
-        <ul class="mb-0 list-unstyled">
-          {% for system in systems %}
-          <li class="d-flex justify-content-between align-items-center mb-1">
-            <div>
-              <strong>{{ system.get_system_type_display }}</strong>
-              {% if system.name %}
-              – {{ system.name }}
-              {% endif %}
-              {% if system.manufacturer %}
-              , {{ system.manufacturer }}
-              {% endif %}
-              {% if system.model %}
-              {{ system.model }}
-              {% endif %}
-              {% if system.in_service_contract %}
-              <span class="badge bg-success ms-1">w umowie</span>
-              {% endif %}
-            </div>
-            <div>
-              <a href="{% url 'core:system_detail' system.pk %}" class="btn btn-sm btn-outline-primary">
-                Szczegóły
-              </a>
-            </div>
-          </li>
-          {% endfor %}
-        </ul>
+        <ul id="site-systems-sortable"
+    class="list-unstyled mb-0"
+    data-reorder-url="{% url 'core:ajax_site_systems_reorder' site.pk %}"
+    data-can-reorder="{% if can_edit %}1{% else %}0{% endif %}">
+
+  {% for sys in systems %}
+    <li class="d-flex align-items-center py-2 border-bottom"
+        data-system-id="{{ sys.id }}">
+
+      {# HOLDER (na początku) #}
+      {% if can_edit %}
+        <span class="drag-handle text-muted me-2"
+              title="Przeciągnij aby ustawić kolejność">
+          <i class="bi bi-grip-vertical"></i>
+        </span>
+      {% endif %}
+
+      {# ŚRODEK: typ (link) + producent-model + umowa #}
+      <div class="d-flex align-items-center gap-3 flex-grow-1 min-w-0">
+
+        <a href="{% url 'core:system_detail' sys.pk %}"
+           class="text-reset text-decoration-none fw-semibold text-truncate"
+           title="{{ sys.get_system_type_display }}">
+          {{ sys.get_system_type_display }}
+        </a>
+
+        <span class="text-muted small text-truncate">
+          {% if sys.manufacturer or sys.model %}
+            {% if sys.manufacturer %}{{ sys.manufacturer }}{% endif %}
+            {% if sys.model %}{% if sys.manufacturer %} – {% endif %}{{ sys.model }}{% endif %}
+          {% else %}
+            —
+          {% endif %}
+        </span>
+
+        <span class="ms-auto">
+          {% if sys.in_service_contract %}
+            <span class="badge bg-success">Umowa</span>
+          {% else %}
+            <span class="badge bg-secondary">Brak umowy</span>
+          {% endif %}
+        </span>
+
+      </div>
+
+      {# PRAWO: 2 przyciski #}
+      {% if can_edit %}
+        <div class="ms-2 d-flex gap-1">
+          <a href="{% url 'core:system_edit' sys.pk %}"
+             class="btn btn-sm btn-primary btn-icon-square"
+             title="Edytuj">
+            <i class="bi bi-pencil"></i>
+          </a>
+
+          <button type="button"
+                  class="btn btn-sm btn-danger btn-icon-square js-system-delete"
+                  title="Usuń"
+                  data-delete-url="{% url 'core:system_delete' sys.pk %}"
+                  data-system-label="{{ sys.get_system_type_display }}">
+            <i class="bi bi-trash"></i>
+          </button>
+        </div>
+      {% endif %}
+    </li>
+  {% endfor %}
+</ul>
+
+
+{% if can_edit and systems|length > 1 %}
+  <div class="text-muted small mt-2">
+    Przeciągnij ikonę <i class="bi bi-grip-vertical"></i>, aby zmienić kolejność systemów.
+  </div>
+  <div id="sysOrderSaving" class="text-muted small mt-1 d-none">Zapisywanie…</div>
+  <div id="sysOrderSaved" class="text-success small mt-1 d-none">Zapisano ✓</div>
+{% endif %}
+
         {% else %}
         <p class="text-muted small mb-0">Brak zdefiniowanych systemów.</p>
         {% endif %}
@@ -231,4 +281,152 @@
   </div>
 </div>
 {% endif %}
+
+<div class="modal fade" id="sysDeleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" id="sysDeleteForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title">Usunąć system?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Zamknij"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">
+            Czy na pewno chcesz usunąć system:
+            <strong id="sysDeleteLabel">—</strong>?
+          </p>
+          <p class="text-muted small mt-2 mb-0">Tej operacji nie da się cofnąć.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Anuluj</button>
+          <button type="submit" class="btn btn-danger">Usuń</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const listEl = document.getElementById("site-systems-sortable");
+  if (!listEl) return;
+  if (listEl.dataset.canReorder !== "1") return;
+
+  const saveUrl = listEl.dataset.reorderUrl;
+  const savingEl = document.getElementById("sysOrderSaving");
+  const savedEl  = document.getElementById("sysOrderSaved");
+
+  function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(";").shift();
+    return "";
+  }
+
+  function ensureSortable(cb) {
+    if (window.Sortable) return cb();
+
+    // 1) spróbuj lokalnie (jeśli masz vendor), 2) fallback CDN
+    const srcs = [
+      "{% static 'vendor/sortablejs/Sortable.min.js' %}",
+      "https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"
+    ];
+
+    let i = 0;
+    const loadNext = () => {
+      if (i >= srcs.length) return; // nie udało się załadować
+      const s = document.createElement("script");
+      s.src = srcs[i++];
+      s.onload = () => cb();
+      s.onerror = () => loadNext();
+      document.head.appendChild(s);
+    };
+    loadNext();
+  }
+
+  let timer = null;
+
+  async function saveOrder() {
+    const ids = Array.from(listEl.querySelectorAll("[data-system-id]"))
+      .map(el => el.dataset.systemId);
+
+    if (savingEl) savingEl.classList.remove("d-none");
+    if (savedEl) savedEl.classList.add("d-none");
+
+    try {
+      const resp = await fetch(saveUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "X-CSRFToken": getCookie("csrftoken")
+        },
+        body: JSON.stringify({ order: ids })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.ok) throw new Error(data.error || "save failed");
+
+      if (savedEl) {
+        savedEl.classList.remove("d-none");
+        setTimeout(() => savedEl.classList.add("d-none"), 1200);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (savingEl) savingEl.classList.add("d-none");
+    }
+  }
+
+  function scheduleSave() {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(saveOrder, 250);
+  }
+
+  ensureSortable(() => {
+    if (!window.Sortable) return;
+
+    new Sortable(listEl, {
+      handle: ".drag-handle",
+      animation: 150,
+      onEnd: scheduleSave
+    });
+  });
+})();
+</script>
+
+
+<script>
+(function () {
+  const modalEl = document.getElementById("sysDeleteModal");
+  const form = document.getElementById("sysDeleteForm");
+  const labelEl = document.getElementById("sysDeleteLabel");
+  if (!modalEl || !form || !labelEl) return;
+
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest(".js-system-delete");
+    if (!btn) return;
+
+    e.preventDefault();
+
+    const url = btn.getAttribute("data-delete-url");
+    if (!url) return;
+
+    form.action = url;
+    labelEl.textContent = btn.getAttribute("data-system-label") || "ten system";
+
+    // Bootstrap może być załadowany później — dlatego tworzymy instancję dopiero tutaj
+    if (window.bootstrap && bootstrap.Modal) {
+      bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    } else {
+      // awaryjnie: zwykłe confirm (gdyby ktoś usunął bootstrap js)
+      if (confirm(`Usunąć system: ${labelEl.textContent}?`)) form.submit();
+    }
+  });
+})();
+</script>
+
+
 {% endblock %}

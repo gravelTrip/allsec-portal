@@ -98,11 +98,13 @@ urlpatterns = [
     path("zarzadcy/<int:pk>/edytuj/", views.manager_edit, name="manager_edit"),
     path("zarzadcy/<int:pk>/usun/", views.manager_delete, name="manager_delete"),
 
-    path(
-        "ajax/site/<int:site_id>/systems/",
-        views.ajax_site_systems,
-        name="ajax_site_systems",
-    ),
+    path("ajax/site/<int:site_id>/systems/", views.ajax_site_systems, name="ajax_site_systems"),
+    path("ajax/site/<int:site_id>/systems/reorder/", views.ajax_site_systems_reorder, name="ajax_site_systems_reorder"),
+
+
+
+
+
     path(
         "protokoly/<int:pk>/pdf/",
         views.service_report_pdf,

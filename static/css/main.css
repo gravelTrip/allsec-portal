@@ -229,9 +229,18 @@ main h1.h3 {
   cursor: grabbing;
 }
 
-.drag-handle i {
-  font-size: 1.1rem;
-  line-height: 1;
+.drag-handle{
+  cursor: grab;
+  user-select: none;
+  padding: 2px 4px;
+}
+
+/* SortableJS klasy */
+.sortable-ghost {
+  opacity: .35;
+}
+.sortable-chosen {
+  border-radius: .25rem;
 }
 
 
